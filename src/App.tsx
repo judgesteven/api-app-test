@@ -314,6 +314,12 @@ function App() {
         isStored={isStored}
         selectedPlayerId={formData.player}
       />
+      <hr style={{ 
+        margin: '30px auto',
+        width: '80%',
+        border: 'none',
+        borderTop: '1px solid #e0e0e0'
+      }} />
       {playerProfile && <PlayerProfile player={playerProfile} isLoading={false} teams={teams} />}
       <Missions 
         missions={missions} 
