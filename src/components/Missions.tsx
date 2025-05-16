@@ -34,6 +34,17 @@ interface Prize {
   points?: number;
   credits?: number;
   imgUrl?: string;
+  stock?: {
+    redeemed: number;
+    available: number;
+    count: number;
+  };
+  expires_at?: string;
+  end_date?: string;
+  active?: {
+    from: string;
+    to: string;
+  };
 }
 
 interface MissionsProps {
@@ -135,25 +146,51 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       return;
     }
 
+    const apiKey = localStorage.getItem('apiKey');
+    const account = localStorage.getItem('account');
+    
+    if (!apiKey || !account) {
+      console.error('Missing required data:', { hasApiKey: !!apiKey, hasAccount: !!account });
+      toast.error('API key or account is missing');
+      return;
+    }
+
     setIsLoadingPrizes(true);
     try {
-      const response = await fetch(`https://api.gamelayer.co/api/v0/prizes?player=${encodeURIComponent(playerProfile.player_id)}`, {
+      const response = await fetch(`https://api.gamelayer.co/api/v0/prizes?account=${encodeURIComponent(account)}&player=${encodeURIComponent(playerProfile.player_id)}`, {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          "api-key": localStorage.getItem('apiKey') || ''
+          "api-key": apiKey
         }
       });
 
+      if (response.status === 401) {
+        throw new Error('Unauthorized: Please check your API key');
+      }
+
       if (!response.ok) {
-        throw new Error('Failed to fetch prizes');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to fetch prizes: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('Prizes data from API:', data);
+      // Log each prize's expiration data
+      if (Array.isArray(data)) {
+        data.forEach(prize => {
+          console.log('Prize expiration data:', {
+            name: prize.name,
+            expires_at: prize.expires_at,
+            active: prize.active,
+            end_date: prize.end_date
+          });
+        });
+      }
       setPrizes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching prizes:', error);
-      toast.error('Failed to fetch prizes');
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch prizes');
     } finally {
       setIsLoadingPrizes(false);
     }
@@ -179,19 +216,25 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
         display: 'flex', 
         gap: '20px', 
         marginBottom: '20px',
-        borderBottom: '1px solid #e0e0e0'
+        borderBottom: '1px solid #e0e0e0',
+        padding: '0 20px'
       }}>
         <button
           onClick={() => setActiveTab('missions')}
           style={{
-            padding: '10px 20px',
+            padding: '12px 24px',
             backgroundColor: activeTab === 'missions' ? '#646cff' : 'transparent',
-            color: activeTab === 'missions' ? 'white' : '#333',
+            color: activeTab === 'missions' ? 'white' : '#666',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '1em',
+            fontSize: '1.1em',
             fontWeight: 'bold',
-            borderBottom: activeTab === 'missions' ? '2px solid #646cff' : 'none'
+            borderRadius: '8px 8px 0 0',
+            transition: 'all 0.2s ease',
+            position: 'relative',
+            marginBottom: '-1px',
+            borderBottom: activeTab === 'missions' ? '3px solid #646cff' : 'none',
+            boxShadow: activeTab === 'missions' ? '0 -2px 4px rgba(0,0,0,0.1)' : 'none'
           }}
         >
           Missions
@@ -199,14 +242,19 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
         <button
           onClick={() => setActiveTab('prizes')}
           style={{
-            padding: '10px 20px',
+            padding: '12px 24px',
             backgroundColor: activeTab === 'prizes' ? '#646cff' : 'transparent',
-            color: activeTab === 'prizes' ? 'white' : '#333',
+            color: activeTab === 'prizes' ? 'white' : '#666',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '1em',
+            fontSize: '1.1em',
             fontWeight: 'bold',
-            borderBottom: activeTab === 'prizes' ? '2px solid #646cff' : 'none'
+            borderRadius: '8px 8px 0 0',
+            transition: 'all 0.2s ease',
+            position: 'relative',
+            marginBottom: '-1px',
+            borderBottom: activeTab === 'prizes' ? '3px solid #646cff' : 'none',
+            boxShadow: activeTab === 'prizes' ? '0 -2px 4px rgba(0,0,0,0.1)' : 'none'
           }}
         >
           Prizes
@@ -360,10 +408,18 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                       display: 'flex', 
                       gap: '20px',
                       marginTop: 'auto',
-                      flexWrap: 'wrap',
-                      justifyContent: 'space-between'
+                      flexWrap: mission.priority === 2 ? 'nowrap' : 'wrap',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      width: '100%'
                     }}>
-                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '20px', 
+                        flexWrap: mission.priority === 2 ? 'nowrap' : 'wrap',
+                        alignItems: 'center',
+                        flex: mission.priority === 2 ? 1 : 'auto'
+                      }}>
                         {points !== undefined && (
                           <div style={{
                             backgroundColor: '#646cff',
@@ -373,7 +429,8 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: mission.priority === 2 ? '4px' : '6px'
+                            gap: mission.priority === 2 ? '4px' : '6px',
+                            whiteSpace: 'nowrap'
                           }}>
                             <span style={{ fontWeight: 'bold' }}>Points:</span>
                             <span>{points.toLocaleString()}</span>
@@ -388,7 +445,8 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: mission.priority === 2 ? '4px' : '6px'
+                            gap: mission.priority === 2 ? '4px' : '6px',
+                            whiteSpace: 'nowrap'
                           }}>
                             <span style={{ fontWeight: 'bold' }}>Credits:</span>
                             <span>{credits.toLocaleString()}</span>
@@ -403,7 +461,8 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             fontSize: '0.9em',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px'
+                            gap: '6px',
+                            whiteSpace: 'nowrap'
                           }}>
                             <span style={{ fontWeight: 'bold' }}>Status:</span>
                             <span>{mission.status}</span>
@@ -417,7 +476,11 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                           display: 'flex',
                           alignItems: 'center',
                           position: 'relative',
-                          cursor: 'help'
+                          cursor: 'help',
+                          padding: '6px',
+                          backgroundColor: '#f0f0f0',
+                          borderRadius: '6px',
+                          flexShrink: 0
                         }}
                         title={`Expires in: ${getTimeRemaining(mission.active.to)}`}
                         >
@@ -426,7 +489,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             height="20" 
                             viewBox="0 0 24 24" 
                             fill="none" 
-                            stroke="currentColor" 
+                            stroke="#666" 
                             strokeWidth="2" 
                             strokeLinecap="round" 
                             strokeLinejoin="round"
@@ -454,78 +517,218 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
               No prizes available
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '20px' }}>
+            <div style={{ 
+              display: 'grid', 
+              gap: '20px',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(800px, 1fr))'
+            }}>
               {prizes.map((prize) => (
                 <div
                   key={prize.id}
                   style={{
                     padding: '20px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '12px',
+                    backgroundColor: '#f8f8f8',
                     display: 'flex',
                     gap: '20px',
-                    alignItems: 'center'
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer',
+                    width: '100%',
+                    maxWidth: '800px',
+                    margin: '0 auto'
                   }}
                 >
-                  {prize.imgUrl && (
-                    <div style={{
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      flexShrink: 0
-                    }}>
-                      <img 
-                        src={prize.imgUrl} 
-                        alt={prize.name}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                      />
-                    </div>
-                  )}
+                  {/* Prize Image */}
+                  <div style={{
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    backgroundColor: '#e0e0e0',
+                    alignSelf: 'center'
+                  }}>
+                    <img 
+                      src={prize.imgUrl || 'https://via.placeholder.com/120x120?text=Prize'} 
+                      alt={prize.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                  </div>
+
+                  {/* Prize Content */}
                   <div style={{ flex: 1 }}>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>{prize.name}</h3>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '10px'
+                    }}>
+                      <h3 style={{ 
+                        margin: 0,
+                        color: '#333',
+                        fontSize: '1.2em',
+                        fontWeight: 'bold'
+                      }}>
+                        {prize.name}
+                      </h3>
+                    </div>
+                    
                     {prize.description && (
-                      <p style={{ color: '#666', marginBottom: '15px' }}>{prize.description}</p>
+                      <p style={{ 
+                        color: '#666', 
+                        marginBottom: '15px',
+                        fontSize: '0.95em',
+                        lineHeight: '1.4',
+                        textAlign: 'left'
+                      }}>
+                        {prize.description}
+                      </p>
                     )}
-                    <div style={{ display: 'flex', gap: '20px' }}>
-                      {prize.points !== undefined && (
-                        <div>
-                          <div style={{ color: '#666', fontSize: '0.9em' }}>Points Required</div>
-                          <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{prize.points.toLocaleString()}</div>
+
+                    {/* Prize Stats */}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '20px',
+                      marginTop: 'auto',
+                      flexWrap: 'wrap',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      width: '100%'
+                    }}>
+                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {prize.points !== undefined && (
+                          <div style={{
+                            backgroundColor: '#646cff',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.9em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <span style={{ fontWeight: 'bold' }}>Points:</span>
+                            <span>{prize.points.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {prize.credits !== undefined && (
+                          <div style={{
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.9em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <span style={{ fontWeight: 'bold' }}>Credits:</span>
+                            <span>{prize.credits.toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div style={{
+                          backgroundColor: '#ff9800',
+                          color: 'white',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.9em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{ fontWeight: 'bold' }}>Available:</span>
+                          <span>{prize.stock?.available?.toLocaleString() || '0'}</span>
                         </div>
-                      )}
-                      {prize.credits !== undefined && (
-                        <div>
-                          <div style={{ color: '#666', fontSize: '0.9em' }}>Credits Required</div>
-                          <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{prize.credits.toLocaleString()}</div>
+                        <div style={{
+                          backgroundColor: '#646cff',
+                          color: 'white',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.9em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          cursor: 'pointer'
+                        }}
+                        onClick={async () => {
+                          try {
+                            const account = localStorage.getItem('account');
+                            const apiKey = localStorage.getItem('apiKey');
+                            
+                            if (!account || !apiKey) {
+                              toast.error('Missing account or API key');
+                              return;
+                            }
+
+                            const response = await fetch(`https://api.gamelayer.co/api/v0/prizes/${prize.id}/claim`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'api-key': apiKey
+                              },
+                              body: JSON.stringify({
+                                player: playerProfile.player_id,
+                                account: account
+                              })
+                            });
+
+                            if (!response.ok) {
+                              const errorData = await response.json();
+                              throw new Error(errorData?.message || `Failed to claim prize: ${response.status} ${response.statusText}`);
+                            }
+
+                            toast.success('Prize claimed successfully!');
+                            // Refresh both the prizes list and player profile
+                            await Promise.all([
+                              fetchPrizes(),
+                              onRefresh()
+                            ]);
+                          } catch (error) {
+                            console.error('Error claiming prize:', error);
+                            toast.error(error instanceof Error ? error.message : 'Failed to claim prize');
+                          }
+                        }}>
+                          <span style={{ fontWeight: 'bold' }}>Claim</span>
+                        </div>
+                      </div>
+                      {(prize.expires_at || prize.active?.to || prize.end_date) && (
+                        <div style={{
+                          color: '#666',
+                          fontSize: '0.9em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          position: 'relative',
+                          cursor: 'help',
+                          padding: '6px',
+                          backgroundColor: '#f0f0f0',
+                          borderRadius: '6px',
+                          marginLeft: 'auto'
+                        }}
+                        title={`Expires in: ${getTimeRemaining(prize.expires_at || prize.active?.to || prize.end_date || '')}`}
+                        >
+                          <svg 
+                            width="20" 
+                            height="20" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="#666" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                          </svg>
                         </div>
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      // TODO: Implement prize redemption
-                      toast.info('Prize redemption coming soon!');
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#646cff',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.9em',
-                      fontWeight: 'bold',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Redeem
-                  </button>
                 </div>
               ))}
             </div>
