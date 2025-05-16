@@ -20,6 +20,21 @@ interface Mission {
   };
 }
 
+interface Achievement {
+  id: string;
+  name: string;
+  description?: string;
+  imgUrl?: string;
+  status?: string;
+  progress?: number;
+  total?: number;
+  reward?: {
+    points?: number;
+    credits?: number;
+  };
+  unlocked_at?: string;
+}
+
 interface Event {
   id: string;
   name: string;
@@ -56,9 +71,30 @@ interface MissionsProps {
 }
 
 const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, playerProfile, onRefresh }) => {
-  const [activeTab, setActiveTab] = useState<'missions' | 'prizes'>('missions');
+  const [activeTab, setActiveTab] = useState<'missions' | 'prizes' | 'achievements'>('missions');
   const [prizes, setPrizes] = useState<Prize[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([
+    {
+      id: 'placeholder1',
+      name: 'First Steps',
+      description: 'Complete your first mission',
+      imgUrl: 'https://via.placeholder.com/80x80?text=First',
+      progress: 75,
+      total: 100,
+      status: 'In Progress'
+    },
+    {
+      id: 'placeholder2',
+      name: 'Prize Hunter',
+      description: 'Claim your first prize',
+      imgUrl: 'https://via.placeholder.com/80x80?text=Prize',
+      progress: 50,
+      total: 100,
+      status: 'In Progress'
+    }
+  ]);
   const [isLoadingPrizes, setIsLoadingPrizes] = useState(false);
+  const [isLoadingAchievements, setIsLoadingAchievements] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [hoveredBadge, setHoveredBadge] = useState<string | null>(null);
@@ -214,9 +250,56 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
     }
   };
 
+  const fetchAchievements = async () => {
+    if (!playerProfile?.player_id) {
+      console.log('No player ID available for fetching achievements');
+      return;
+    }
+
+    const apiKey = localStorage.getItem('apiKey');
+    const account = localStorage.getItem('account');
+    
+    if (!apiKey || !account) {
+      console.error('Missing required data:', { hasApiKey: !!apiKey, hasAccount: !!account });
+      toast.error('API key or account is missing');
+      return;
+    }
+
+    setIsLoadingAchievements(true);
+    try {
+      const response = await fetch(`https://api.gamelayer.co/api/v0/achievements?account=${encodeURIComponent(account)}&player=${encodeURIComponent(playerProfile.player_id)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": apiKey
+        }
+      });
+
+      if (response.status === 401) {
+        throw new Error('Unauthorized: Please check your API key');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to fetch achievements: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Achievements data from API:', data);
+      setAchievements(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching achievements:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch achievements');
+    } finally {
+      setIsLoadingAchievements(false);
+    }
+  };
+
   React.useEffect(() => {
     if (activeTab === 'prizes' && playerProfile?.player_id) {
       fetchPrizes();
+    } else if (activeTab === 'achievements' && playerProfile?.player_id) {
+      fetchAchievements();
     }
   }, [activeTab, playerProfile?.player_id]);
 
@@ -278,6 +361,27 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
           }}
         >
           Prizes
+        </button>
+        <button
+          onClick={() => setActiveTab('achievements')}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: activeTab === 'achievements' ? '#646cff' : 'transparent',
+            color: activeTab === 'achievements' ? 'white' : '#666',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.1em',
+            fontWeight: 'bold',
+            borderRadius: '8px 8px 0 0',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            marginBottom: '-1px',
+            borderBottom: activeTab === 'achievements' ? '3px solid #646cff' : 'none',
+            boxShadow: activeTab === 'achievements' ? '0 -2px 4px rgba(0,0,0,0.1)' : 'none',
+            transform: activeTab === 'achievements' ? 'scale(1.05)' : 'scale(1)'
+          }}
+        >
+          Achievements
         </button>
       </div>
 
@@ -394,17 +498,17 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     {/* Mission Image */}
                     <div style={{
                       width: mission.priority === 2 ? '90px' : '120px',
-                      height: mission.priority === 2 ? '90px' : '120px',
+                      height: '100%',
                       borderRadius: '8px',
                       overflow: 'hidden',
                       flexShrink: 0,
                       backgroundColor: '#e0e0e0',
-                      alignSelf: 'center',
+                      alignSelf: 'stretch',
                       transition: 'all 0.3s ease',
                       transform: isHovered ? 'scale(1.05)' : 'scale(1)'
                     }}>
                       <img 
-                        src={mission.imgUrl || 'https://via.placeholder.com/120x120?text=Mission'} 
+                        src={mission.imgUrl || 'https://via.placeholder.com/120x400?text=Mission'} 
                         alt={mission.name}
                         style={{
                           width: '100%',
@@ -417,7 +521,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     </div>
 
                     {/* Mission Content */}
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, padding: '0 8px' }}>
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between',
@@ -461,22 +565,22 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                         gap: '20px',
                         marginTop: 'auto',
                         flexWrap: mission.priority === 2 ? 'nowrap' : 'wrap',
-                        justifyContent: 'space-between',
+                        justifyContent: mission.priority === 2 ? 'flex-start' : 'space-between',
                         alignItems: 'center',
                         width: '100%'
                       }}>
                         <div style={{ 
                           display: 'flex', 
-                          gap: '20px', 
+                          gap: mission.priority === 2 ? '10px' : '20px', 
                           flexWrap: mission.priority === 2 ? 'nowrap' : 'wrap',
                           alignItems: 'center',
-                          flex: mission.priority === 2 ? 1 : 'auto'
+                          flex: mission.priority === 2 ? 'none' : 'auto'
                         }}>
                           {points !== undefined && (
                             <div style={{
                               backgroundColor: '#646cff',
                               color: 'white',
-                              padding: mission.priority === 2 ? '2px 6px' : '6px 12px',
+                              padding: mission.priority === 2 ? '4px 8px' : '6px 12px',
                               borderRadius: '6px',
                               fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
                               display: 'flex',
@@ -485,7 +589,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                               whiteSpace: 'nowrap',
                               transition: 'all 0.3s ease',
                               transform: hoveredBadge === `points-${mission.id}` ? 'scale(1.05)' : 'scale(1)',
-                              boxShadow: hoveredBadge === `points-${mission.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                              boxShadow: hoveredBadge === `points-${mission.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                              height: mission.priority === 2 ? '28px' : 'auto',
+                              flexShrink: 0
                             }}
                             onMouseEnter={() => setHoveredBadge(`points-${mission.id}`)}
                             onMouseLeave={() => setHoveredBadge(null)}
@@ -498,7 +604,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             <div style={{
                               backgroundColor: '#4CAF50',
                               color: 'white',
-                              padding: mission.priority === 2 ? '2px 6px' : '6px 12px',
+                              padding: mission.priority === 2 ? '4px 8px' : '6px 12px',
                               borderRadius: '6px',
                               fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
                               display: 'flex',
@@ -507,7 +613,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                               whiteSpace: 'nowrap',
                               transition: 'all 0.3s ease',
                               transform: hoveredBadge === `credits-${mission.id}` ? 'scale(1.05)' : 'scale(1)',
-                              boxShadow: hoveredBadge === `credits-${mission.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                              boxShadow: hoveredBadge === `credits-${mission.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                              height: mission.priority === 2 ? '28px' : 'auto',
+                              flexShrink: 0
                             }}
                             onMouseEnter={() => setHoveredBadge(`credits-${mission.id}`)}
                             onMouseLeave={() => setHoveredBadge(null)}
@@ -520,16 +628,18 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             <div style={{
                               backgroundColor: '#ff9800',
                               color: 'white',
-                              padding: '6px 12px',
+                              padding: mission.priority === 2 ? '4px 8px' : '6px 12px',
                               borderRadius: '6px',
-                              fontSize: '0.9em',
+                              fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '6px',
+                              gap: mission.priority === 2 ? '4px' : '6px',
                               whiteSpace: 'nowrap',
                               transition: 'all 0.3s ease',
                               transform: hoveredBadge === `status-${mission.id}` ? 'scale(1.05)' : 'scale(1)',
-                              boxShadow: hoveredBadge === `status-${mission.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                              boxShadow: hoveredBadge === `status-${mission.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                              height: mission.priority === 2 ? '28px' : 'auto',
+                              flexShrink: 0
                             }}
                             onMouseEnter={() => setHoveredBadge(`status-${mission.id}`)}
                             onMouseLeave={() => setHoveredBadge(null)}
@@ -538,39 +648,40 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                               <span>{mission.status}</span>
                             </div>
                           )}
-                        </div>
-                        {mission.active?.to && (
-                          <div style={{
-                            color: '#666',
-                            fontSize: '0.9em',
-                            display: 'flex',
-                            alignItems: 'center',
-                            position: 'relative',
-                            cursor: 'help',
-                            padding: '6px',
-                            backgroundColor: isHovered ? '#e0e0e0' : '#f0f0f0',
-                            borderRadius: '6px',
-                            flexShrink: 0,
-                            transition: 'all 0.3s ease',
-                            transform: isHovered ? 'scale(1.05)' : 'scale(1)'
-                          }}
-                          title={`Expires in: ${getTimeRemaining(mission.active.to)}`}
-                          >
-                            <svg 
-                              width="20" 
-                              height="20" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke={isHovered ? '#646cff' : '#666'} 
-                              strokeWidth="2" 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round"
+                          {mission.active?.to && (
+                            <div style={{
+                              color: '#666',
+                              fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
+                              display: 'flex',
+                              alignItems: 'center',
+                              position: 'relative',
+                              cursor: 'help',
+                              padding: mission.priority === 2 ? '4px' : '6px',
+                              backgroundColor: isHovered ? '#e0e0e0' : '#f0f0f0',
+                              borderRadius: '6px',
+                              flexShrink: 0,
+                              transition: 'all 0.3s ease',
+                              transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                              height: mission.priority === 2 ? '28px' : 'auto'
+                            }}
+                            title={`Expires in: ${getTimeRemaining(mission.active.to)}`}
                             >
-                              <circle cx="12" cy="12" r="10"/>
-                              <polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                          </div>
-                        )}
+                              <svg 
+                                width={mission.priority === 2 ? '16' : '20'} 
+                                height={mission.priority === 2 ? '16' : '20'} 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke={isHovered ? '#646cff' : '#666'} 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                              >
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                              </svg>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -654,17 +765,17 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                         {/* Prize Image */}
                         <div style={{
                           width: '120px',
-                          height: '120px',
+                          height: '100%',
                           borderRadius: '8px',
                           overflow: 'hidden',
                           flexShrink: 0,
                           backgroundColor: '#e0e0e0',
-                          alignSelf: 'center',
+                          alignSelf: 'stretch',
                           transition: 'all 0.3s ease',
                           transform: isHovered ? 'scale(1.05)' : 'scale(1)'
                         }}>
                           <img 
-                            src={prize.imgUrl || 'https://via.placeholder.com/120x120?text=Prize'} 
+                            src={prize.imgUrl || 'https://via.placeholder.com/120x400?text=Prize'} 
                             alt={prize.name}
                             style={{
                               width: '100%',
@@ -677,7 +788,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                         </div>
 
                         {/* Prize Content */}
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, padding: '0 8px' }}>
                           <div style={{ 
                             display: 'flex', 
                             justifyContent: 'space-between',
@@ -869,6 +980,183 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                                   <circle cx="12" cy="12" r="10"/>
                                   <polyline points="12 6 12 12 16 14"/>
                                 </svg>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{
+          width: '100%',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          opacity: activeTab === 'achievements' ? 1 : 0,
+          transform: activeTab === 'achievements' ? 'translateX(0)' : 'translateX(20px)',
+          pointerEvents: activeTab === 'achievements' ? 'auto' : 'none',
+          visibility: activeTab === 'achievements' ? 'visible' : 'hidden',
+          position: activeTab === 'achievements' ? 'relative' : 'absolute'
+        }}>
+          <div style={{ 
+            opacity: isLoadingAchievements ? 0.5 : 1,
+            transition: 'all 0.3s ease',
+            transform: isLoadingAchievements ? 'scale(0.98)' : 'scale(1)'
+          }}>
+            {isLoadingAchievements ? (
+              <div style={{ 
+                textAlign: 'center', 
+                color: '#666',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)'
+              }}>
+                Loading achievements...
+              </div>
+            ) : (
+              <div style={{
+                padding: '20px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                maxWidth: '800px',
+                margin: '20px auto'
+              }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gap: '20px',
+                  gridTemplateColumns: 'repeat(3, 1fr)'
+                }}>
+                  {achievements.map((achievement) => {
+                    const isHovered = hoveredCard === achievement.id;
+                    return (
+                      <div
+                        key={achievement.id}
+                        style={{
+                          padding: '15px',
+                          border: `1px solid ${isHovered ? '#646cff' : '#e0e0e0'}`,
+                          borderRadius: '12px',
+                          backgroundColor: '#f8f8f8',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          transition: 'all 0.3s ease',
+                          cursor: 'pointer',
+                          width: '100%',
+                          transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+                          boxShadow: isHovered ? '0 4px 8px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={() => setHoveredCard(achievement.id)}
+                        onMouseLeave={() => setHoveredCard(null)}
+                      >
+                        {/* Achievement Image */}
+                        <div style={{
+                          width: '100%',
+                          height: '120px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          backgroundColor: '#e0e0e0',
+                          transition: 'all 0.3s ease',
+                          transform: isHovered ? 'scale(1.05)' : 'scale(1)'
+                        }}>
+                          <img 
+                            src={achievement.imgUrl || 'https://via.placeholder.com/400x120?text=Achievement'} 
+                            alt={achievement.name}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              transition: 'all 0.3s ease',
+                              transform: isHovered ? 'scale(1.1)' : 'scale(1)'
+                            }}
+                          />
+                        </div>
+
+                        {/* Achievement Content */}
+                        <div style={{ flex: 1, padding: '0 8px' }}>
+                          <h3 style={{ 
+                            margin: '0 0 8px 0',
+                            color: isHovered ? '#646cff' : '#333',
+                            fontSize: '1em',
+                            fontWeight: 'bold',
+                            transition: 'all 0.3s ease',
+                            textAlign: 'center'
+                          }}>
+                            {achievement.name}
+                          </h3>
+                          
+                          {achievement.description && (
+                            <p style={{ 
+                              color: isHovered ? '#646cff' : '#666', 
+                              marginBottom: '12px',
+                              fontSize: '0.85em',
+                              lineHeight: '1.4',
+                              textAlign: 'center',
+                              transition: 'all 0.3s ease',
+                              cursor: 'help'
+                            }}
+                            title={achievement.description}
+                            >
+                              {achievement.description.length > 100 
+                                ? `${achievement.description.substring(0, 100)}...`
+                                : achievement.description}
+                            </p>
+                          )}
+
+                          {/* Achievement Stats */}
+                          <div style={{ 
+                            display: 'flex', 
+                            gap: '10px',
+                            marginTop: 'auto',
+                            flexWrap: 'wrap',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}>
+                            {achievement.progress !== undefined && (
+                              <div style={{
+                                backgroundColor: '#646cff',
+                                color: 'white',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.8em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.3s ease',
+                                transform: hoveredBadge === `progress-${achievement.id}` ? 'scale(1.05)' : 'scale(1)',
+                                boxShadow: hoveredBadge === `progress-${achievement.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                              }}
+                              onMouseEnter={() => setHoveredBadge(`progress-${achievement.id}`)}
+                              onMouseLeave={() => setHoveredBadge(null)}
+                              >
+                                <span style={{ fontWeight: 'bold' }}>Progress:</span>
+                                <span>{achievement.progress.toLocaleString()}%</span>
+                              </div>
+                            )}
+                            {achievement.total !== undefined && (
+                              <div style={{
+                                backgroundColor: '#4CAF50',
+                                color: 'white',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.8em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.3s ease',
+                                transform: hoveredBadge === `total-${achievement.id}` ? 'scale(1.05)' : 'scale(1)',
+                                boxShadow: hoveredBadge === `total-${achievement.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                              }}
+                              onMouseEnter={() => setHoveredBadge(`total-${achievement.id}`)}
+                              onMouseLeave={() => setHoveredBadge(null)}
+                              >
+                                <span style={{ fontWeight: 'bold' }}>Total:</span>
+                                <span>{achievement.total.toLocaleString()}</span>
                               </div>
                             )}
                           </div>
