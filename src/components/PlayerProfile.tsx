@@ -4,7 +4,11 @@ interface PlayerProfileProps {
   player: {
     name: string;
     avatar: string;
-    level: number;
+    level: {
+      name: string;
+      description?: string;
+      imgUrl?: string;
+    };
     team: string;
     points: number;
     credits: number;
@@ -39,19 +43,13 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
   const safePlayer = {
     name: String(player.name || ''),
     avatar: String(player.avatar || player.imgUrl || ''),
-    level: Number(player.level || 0),
-    team: String(player.team || ''),
+    level: String(player.level?.name || 'Unknown Level'),
+    levelDescription: String(player.level?.description || ''),
+    levelImage: String(player.level?.imgUrl || ''),
+    team: teams[player.team] || String(player.team || ''),
     points: Number(player.points || 0),
     credits: Number(player.credits || 0),
     description: String(player.description || '')
-  };
-
-  // Format level display
-  const formatLevel = (level: number) => {
-    if (level === null || isNaN(level)) {
-      return 'n/a';
-    }
-    return level.toString();
   };
 
   return (
@@ -93,7 +91,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
             <div>
               <div style={{ color: '#666', fontSize: '0.9em' }}>Level</div>
-              <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{formatLevel(safePlayer.level)}</div>
+              <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{safePlayer.level}</div>
             </div>
             <div>
               <div style={{ color: '#666', fontSize: '0.9em' }}>Team</div>

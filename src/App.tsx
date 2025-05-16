@@ -179,6 +179,11 @@ function App() {
 
       const data = await response.json();
       
+      console.log('Player data from API:', {
+        level: data.level,
+        rawData: data
+      });
+      
       // Fetch team name if team ID exists
       if (data.team_id) {
         const teamResponse = await fetch(`https://api.gamelayer.co/api/v0/teams/${data.team_id}?account=${encodeURIComponent(formData.account)}`, {
@@ -198,7 +203,9 @@ function App() {
       setPlayerProfile({
         name: data.name || '',
         avatar: data.avatar || data.imgUrl || '',
-        level: data.level || 0,
+        level: data.level?.name || 'Unknown Level',
+        levelDescription: data.level?.description || '',
+        levelImage: data.level?.imgUrl || '',
         team: data.team || '',
         points: data.points || 0,
         credits: data.credits || 0,
