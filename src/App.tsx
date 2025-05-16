@@ -58,13 +58,9 @@ function App() {
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(null);
   const [teams, setTeams] = useState<Record<string, string>>({});
   const [missions, setMissions] = useState<Mission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingPlayer, setIsLoadingPlayer] = useState(false);
-  const [isLoadingMissions, setIsLoadingMissions] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isStored, setIsStored] = useState(!!(savedAccount && savedApiKey));
   const [playerProfile, setPlayerProfile] = useState<any>(null);
 
@@ -76,7 +72,6 @@ function App() {
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       // Fetch players
@@ -124,7 +119,7 @@ function App() {
       console.log('Teams data:', teamsMap);
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching data:', err);
       setPlayers([]);
       setEvents([]);
     } finally {
@@ -137,9 +132,6 @@ function App() {
       console.log('Missing required data for missions:', { account: formData.account, apiKey: !!formData.apiKey, playerId });
       return;
     }
-
-    setIsLoadingMissions(true);
-    setError(null);
 
     try {
       const url = `https://api.gamelayer.co/api/v0/missions?account=${encodeURIComponent(formData.account)}&player=${encodeURIComponent(playerId)}`;
@@ -185,10 +177,7 @@ function App() {
       setMissions(missionsArray);
     } catch (err) {
       console.error('Error fetching player missions:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
       setMissions([]);
-    } finally {
-      setIsLoadingMissions(false);
     }
   };
 
@@ -197,9 +186,6 @@ function App() {
       console.log('Missing required data:', { account: formData.account, apiKey: !!formData.apiKey, playerId });
       return;
     }
-
-    setIsLoadingPlayer(true);
-    setError(null);
 
     try {
       console.log('Fetching player details for ID:', playerId);
@@ -261,15 +247,10 @@ function App() {
       };
       
       console.log('Final player details:', playerDetails);
-      setPlayerDetails(playerDetails);
       setPlayerProfile(playerDetails);
     } catch (err) {
       console.error('Error fetching player details:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setPlayerDetails(null);
       setPlayerProfile(null);
-    } finally {
-      setIsLoadingPlayer(false);
     }
   };
 
@@ -297,9 +278,8 @@ function App() {
 
       const data = await response.json();
       setEvents(data);
-      console.log('Events data:', data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching events:', err);
       setEvents([]);
     }
   };
