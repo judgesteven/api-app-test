@@ -82,7 +82,8 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
         throw new Error(errorData?.message || 'Failed to complete event');
       }
 
-      await response.json(); // Just consume the response
+      // Just consume the response without storing it
+      await response.json();
       toast.success('Success!');
       setSelectedEvent('');
       // Refresh player profile and missions data

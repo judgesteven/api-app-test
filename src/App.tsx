@@ -92,7 +92,6 @@ function App() {
 
       const playersData = await playersResponse.json();
       setPlayers(playersData);
-      console.log('Players data:', playersData);
 
       // Fetch teams
       const teamsResponse = await fetch(`https://api.gamelayer.co/api/v0/teams?account=${encodeURIComponent(formData.account)}`, {
@@ -116,7 +115,6 @@ function App() {
         return acc;
       }, {});
       setTeams(teamsMap);
-      console.log('Teams data:', teamsMap);
 
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -135,7 +133,6 @@ function App() {
 
     try {
       const url = `https://api.gamelayer.co/api/v0/missions?account=${encodeURIComponent(formData.account)}&player=${encodeURIComponent(playerId)}`;
-      console.log('Fetching missions from URL:', url);
       
       const response = await fetch(url, {
         headers: {
@@ -144,8 +141,6 @@ function App() {
           "api-key": formData.apiKey
         }
       });
-
-      console.log('Missions response status:', response.status);
       
       if (!response.ok) {
         if (response.status === 401) {
@@ -157,14 +152,6 @@ function App() {
       }
 
       const data = await response.json();
-      console.log('Raw missions data:', data);
-      console.log('Raw missions data type:', typeof data);
-      console.log('Is raw data array?', Array.isArray(data));
-      if (!Array.isArray(data)) {
-        console.log('Data keys:', Object.keys(data));
-        if (data.missions) console.log('missions array length:', data.missions.length);
-        if (data.data) console.log('data array length:', data.data.length);
-      }
       
       // Ensure we have an array of missions
       const missionsArray = Array.isArray(data) ? data : 
@@ -172,8 +159,6 @@ function App() {
                           (data.data && Array.isArray(data.data)) ? data.data :
                           [];
       
-      console.log('Processed missions array:', missionsArray);
-      console.log('Number of missions:', missionsArray.length);
       setMissions(missionsArray);
     } catch (err) {
       console.error('Error fetching player missions:', err);
@@ -188,7 +173,6 @@ function App() {
     }
 
     try {
-      console.log('Fetching player details for ID:', playerId);
       const response = await fetch(`https://api.gamelayer.co/api/v0/players/${playerId}?account=${encodeURIComponent(formData.account)}`, {
         headers: {
           "Content-Type": "application/json",
@@ -207,12 +191,10 @@ function App() {
       }
 
       const data = await response.json();
-      console.log('Player details received:', data);
       
       // Fetch team name if team ID exists
       let teamName = '';
       if (data.team_id) {
-        console.log('Fetching team details for team ID:', data.team_id);
         const teamResponse = await fetch(`https://api.gamelayer.co/api/v0/teams/${data.team_id}?account=${encodeURIComponent(formData.account)}`, {
           headers: {
             "Content-Type": "application/json",
@@ -223,14 +205,8 @@ function App() {
         
         if (teamResponse.ok) {
           const teamData = await teamResponse.json();
-          console.log('Team data received:', teamData);
           teamName = teamData.name || '';
-          console.log('Setting team name to:', teamName);
-        } else {
-          console.error('Failed to fetch team data:', teamResponse.status);
         }
-      } else {
-        console.log('No team ID found in player data');
       }
       
       const playerDetails = {
@@ -246,7 +222,6 @@ function App() {
         player_id: playerId
       };
       
-      console.log('Final player details:', playerDetails);
       setPlayerProfile(playerDetails);
     } catch (err) {
       console.error('Error fetching player details:', err);
