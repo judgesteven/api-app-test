@@ -74,15 +74,16 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error('API Error:', {
+        const errorData = await response.json();
+        console.error('Error response:', {
           status: response.status,
+          statusText: response.statusText,
           errorData
         });
         throw new Error(errorData?.message || 'Failed to complete event');
       }
 
-      // Just consume the response without assigning to a variable
+      // Just consume the response without assigning it to a variable
       await response.json();
       toast.success('Success!');
       setSelectedEvent('');
