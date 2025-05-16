@@ -52,3 +52,5 @@ export default tseslint.config({
   },
 })
 ```
+
+// Trigger Vercel redeploy
