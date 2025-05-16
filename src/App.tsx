@@ -12,19 +12,6 @@ interface Player {
   player: string;
 }
 
-interface PlayerDetails {
-  name: string;
-  avatar: string;
-  level: number;
-  team: string;
-  points: number;
-  credits: number;
-  description?: string;
-  imgUrl?: string;
-  ordinal?: number;
-  player_id: string;
-}
-
 interface Event {
   id: string;
   name: string;
@@ -193,7 +180,6 @@ function App() {
       const data = await response.json();
       
       // Fetch team name if team ID exists
-      let teamName = '';
       if (data.team_id) {
         const teamResponse = await fetch(`https://api.gamelayer.co/api/v0/teams/${data.team_id}?account=${encodeURIComponent(formData.account)}`, {
           headers: {
@@ -205,7 +191,7 @@ function App() {
         
         if (teamResponse.ok) {
           const teamData = await teamResponse.json();
-          teamName = teamData.name || '';
+          data.team = teamData.name || '';
         }
       }
       
