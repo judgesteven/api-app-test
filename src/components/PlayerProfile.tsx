@@ -5,9 +5,11 @@ interface PlayerProfileProps {
     name: string;
     avatar: string;
     level: {
+      id: string;
       name: string;
       description?: string;
       imgUrl?: string;
+      ordinal?: number;
     };
     team: string;
     points: number;
@@ -44,13 +46,17 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
     name: String(player.name || ''),
     avatar: String(player.avatar || player.imgUrl || ''),
     level: String(player.level?.name || 'Unknown Level'),
-    levelDescription: String(player.level?.description || ''),
-    levelImage: String(player.level?.imgUrl || ''),
     team: teams[player.team] || String(player.team || ''),
     points: Number(player.points || 0),
     credits: Number(player.credits || 0),
     description: String(player.description || '')
   };
+
+  console.log('PlayerProfile safePlayer:', {
+    originalLevel: player.level,
+    safeLevel: safePlayer.level,
+    teams: teams
+  });
 
   return (
     <div style={{

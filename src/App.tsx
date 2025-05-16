@@ -181,6 +181,7 @@ function App() {
       
       console.log('Player data from API:', {
         level: data.level,
+        levelName: data.level?.name,
         rawData: data
       });
       
@@ -203,9 +204,7 @@ function App() {
       setPlayerProfile({
         name: data.name || '',
         avatar: data.avatar || data.imgUrl || '',
-        level: data.level?.name || 'Unknown Level',
-        levelDescription: data.level?.description || '',
-        levelImage: data.level?.imgUrl || '',
+        level: data.level || { name: 'Unknown Level' },
         team: data.team || '',
         points: data.points || 0,
         credits: data.credits || 0,
