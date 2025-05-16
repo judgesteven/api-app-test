@@ -82,7 +82,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
         throw new Error(errorData?.message || 'Failed to complete event');
       }
 
-      // Just consume the response without storing it
+      // Just consume the response without assigning to a variable
       await response.json();
       toast.success('Success!');
       setSelectedEvent('');

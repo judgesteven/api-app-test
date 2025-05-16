@@ -195,7 +195,7 @@ function App() {
         }
       }
       
-      const playerDetails = {
+      setPlayerProfile({
         name: data.name || '',
         avatar: data.avatar || data.imgUrl || '',
         level: data.level || 0,
@@ -206,9 +206,7 @@ function App() {
         imgUrl: data.imgUrl || '',
         ordinal: data.ordinal,
         player_id: playerId
-      };
-      
-      setPlayerProfile(playerDetails);
+      });
     } catch (err) {
       console.error('Error fetching player details:', err);
       setPlayerProfile(null);
