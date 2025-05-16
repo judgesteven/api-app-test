@@ -27,6 +27,15 @@ interface Event {
   status?: string;
 }
 
+interface Prize {
+  id: string;
+  name: string;
+  description?: string;
+  points?: number;
+  credits?: number;
+  imgUrl?: string;
+}
+
 interface MissionsProps {
   missions: Mission[];
   events: Event[];
@@ -36,6 +45,9 @@ interface MissionsProps {
 }
 
 const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, playerProfile, onRefresh }) => {
+  const [activeTab, setActiveTab] = useState<'missions' | 'prizes'>('missions');
+  const [prizes, setPrizes] = useState<Prize[]>([]);
+  const [isLoadingPrizes, setIsLoadingPrizes] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
 
   const handleEventComplete = async (eventId: string) => {
@@ -117,252 +129,409 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
     return parts.join(' ') || 'Less than a minute';
   };
 
+  const fetchPrizes = async () => {
+    if (!playerProfile?.player_id) {
+      console.log('No player ID available for fetching prizes');
+      return;
+    }
+
+    setIsLoadingPrizes(true);
+    try {
+      const response = await fetch(`https://api.gamelayer.co/api/v0/prizes?player=${encodeURIComponent(playerProfile.player_id)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": localStorage.getItem('apiKey') || ''
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch prizes');
+      }
+
+      const data = await response.json();
+      setPrizes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching prizes:', error);
+      toast.error('Failed to fetch prizes');
+    } finally {
+      setIsLoadingPrizes(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === 'prizes' && playerProfile?.player_id) {
+      fetchPrizes();
+    }
+  }, [activeTab, playerProfile?.player_id]);
+
   if (isLoading) {
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
-        Loading missions...
-      </div>
-    );
-  }
-
-  // Ensure missions is an array and has items
-  if (!Array.isArray(missions) || missions.length === 0) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-        No missions available
+        Loading...
       </div>
     );
   }
 
   return (
-    <div style={{
-      padding: '20px',
-      backgroundColor: 'white',
-      borderRadius: '8px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      maxWidth: '800px',
-      margin: '20px auto'
-    }}>
-      {playerProfile && events && events.length > 0 && (
-        <div style={{
-          marginBottom: '20px',
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'center'
-        }}>
-          <select
-            value={selectedEvent}
-            onChange={(e) => setSelectedEvent(e.target.value)}
-            style={{
-              padding: '8px',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              flex: 1
-            }}
-          >
-            <option value="">Complete an Event</option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => selectedEvent && handleEventComplete(selectedEvent)}
-            disabled={!selectedEvent}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: selectedEvent ? '#646cff' : '#ccc',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: selectedEvent ? 'pointer' : 'not-allowed'
-            }}
-          >
-            Go!
-          </button>
-        </div>
-      )}
+    <div style={{ padding: '20px' }}>
       <div style={{ 
-        display: 'grid', 
-        gap: '20px',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(45%, 1fr))'
+        display: 'flex', 
+        gap: '20px', 
+        marginBottom: '20px',
+        borderBottom: '1px solid #e0e0e0'
       }}>
-        {missions.map((mission) => {
-          // Get points and credits from either direct properties or reward object
-          const points = mission.points || mission.reward?.points;
-          const credits = mission.credits || mission.reward?.credits;
-          
-          console.log('Mission data:', {
-            name: mission.name,
-            points,
-            credits,
-            reward: mission.reward,
-            active: mission.active,
-            priority: mission.priority
-          });
+        <button
+          onClick={() => setActiveTab('missions')}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: activeTab === 'missions' ? '#646cff' : 'transparent',
+            color: activeTab === 'missions' ? 'white' : '#333',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1em',
+            fontWeight: 'bold',
+            borderBottom: activeTab === 'missions' ? '2px solid #646cff' : 'none'
+          }}
+        >
+          Missions
+        </button>
+        <button
+          onClick={() => setActiveTab('prizes')}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: activeTab === 'prizes' ? '#646cff' : 'transparent',
+            color: activeTab === 'prizes' ? 'white' : '#333',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1em',
+            fontWeight: 'bold',
+            borderBottom: activeTab === 'prizes' ? '2px solid #646cff' : 'none'
+          }}
+        >
+          Prizes
+        </button>
+      </div>
 
-          return (
-            <div
-              key={mission.id || `mission-${Math.random()}`}
-              style={{
-                padding: '20px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '12px',
-                backgroundColor: '#f8f8f8',
-                display: 'flex',
-                gap: '20px',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                cursor: 'pointer',
-                width: '100%',
-                gridColumn: mission.priority === 2 ? 'auto' : '1 / -1'
-              }}
-            >
-              {/* Mission Image */}
-              <div style={{
-                width: mission.priority === 2 ? '90px' : '120px',
-                height: mission.priority === 2 ? '90px' : '120px',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                flexShrink: 0,
-                backgroundColor: '#e0e0e0',
-                alignSelf: 'center'
-              }}>
-                <img 
-                  src={mission.imgUrl || 'https://via.placeholder.com/120x120?text=Mission'} 
-                  alt={mission.name}
+      {activeTab === 'missions' ? (
+        <div style={{
+          padding: '20px',
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          maxWidth: '800px',
+          margin: '20px auto'
+        }}>
+          {playerProfile && events && events.length > 0 && (
+            <div style={{
+              marginBottom: '20px',
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'center'
+            }}>
+              <select
+                value={selectedEvent}
+                onChange={(e) => setSelectedEvent(e.target.value)}
+                style={{
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  flex: 1
+                }}
+              >
+                <option value="">Complete an Event</option>
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => selectedEvent && handleEventComplete(selectedEvent)}
+                disabled={!selectedEvent}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: selectedEvent ? '#646cff' : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: selectedEvent ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Go!
+              </button>
+            </div>
+          )}
+          <div style={{ 
+            display: 'grid', 
+            gap: '20px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(45%, 1fr))'
+          }}>
+            {missions.map((mission) => {
+              // Get points and credits from either direct properties or reward object
+              const points = mission.points || mission.reward?.points;
+              const credits = mission.credits || mission.reward?.credits;
+              
+              console.log('Mission data:', {
+                name: mission.name,
+                points,
+                credits,
+                reward: mission.reward,
+                active: mission.active,
+                priority: mission.priority
+              });
+
+              return (
+                <div
+                  key={mission.id || `mission-${Math.random()}`}
                   style={{
+                    padding: '20px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '12px',
+                    backgroundColor: '#f8f8f8',
+                    display: 'flex',
+                    gap: '20px',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer',
                     width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
+                    gridColumn: mission.priority === 2 ? 'auto' : '1 / -1'
                   }}
-                />
-              </div>
-
-              {/* Mission Content */}
-              <div style={{ flex: 1 }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: '10px'
-                }}>
-                  <h3 style={{ 
-                    margin: 0,
-                    color: '#333',
-                    fontSize: mission.priority === 2 ? '1em' : '1.2em',
-                    fontWeight: 'bold'
+                >
+                  {/* Mission Image */}
+                  <div style={{
+                    width: mission.priority === 2 ? '90px' : '120px',
+                    height: mission.priority === 2 ? '90px' : '120px',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    backgroundColor: '#e0e0e0',
+                    alignSelf: 'center'
                   }}>
-                    {mission.name || 'Unnamed Mission'}
-                  </h3>
-                </div>
-                
-                {mission.description && (
-                  <p style={{ 
-                    color: '#666', 
-                    marginBottom: '15px',
-                    fontSize: mission.priority === 2 ? '0.85em' : '0.95em',
-                    lineHeight: '1.4',
-                    textAlign: 'left',
-                    cursor: mission.priority === 2 ? 'help' : 'default'
-                  }}
-                  title={mission.priority === 2 ? mission.description : undefined}
-                  >
-                    {mission.priority === 2 
-                      ? mission.description.length > 100 
-                        ? `${mission.description.substring(0, 100)}...`
-                        : mission.description
-                      : mission.description}
-                  </p>
-                )}
-
-                {/* Mission Stats */}
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '20px',
-                  marginTop: 'auto',
-                  flexWrap: 'wrap',
-                  justifyContent: 'space-between'
-                }}>
-                  <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                    {points !== undefined && (
-                      <div style={{
-                        backgroundColor: '#646cff',
-                        color: 'white',
-                        padding: mission.priority === 2 ? '2px 6px' : '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: mission.priority === 2 ? '4px' : '6px'
-                      }}>
-                        <span style={{ fontWeight: 'bold' }}>Points:</span>
-                        <span>{points.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {credits !== undefined && (
-                      <div style={{
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        padding: mission.priority === 2 ? '2px 6px' : '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: mission.priority === 2 ? '4px' : '6px'
-                      }}>
-                        <span style={{ fontWeight: 'bold' }}>Credits:</span>
-                        <span>{credits.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {mission.status && (
-                      <div style={{
-                        backgroundColor: '#ff9800',
-                        color: 'white',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '0.9em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        <span style={{ fontWeight: 'bold' }}>Status:</span>
-                        <span>{mission.status}</span>
-                      </div>
-                    )}
+                    <img 
+                      src={mission.imgUrl || 'https://via.placeholder.com/120x120?text=Mission'} 
+                      alt={mission.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
                   </div>
-                  {mission.active?.to && (
-                    <div style={{
-                      color: '#666',
-                      fontSize: '0.9em',
-                      display: 'flex',
-                      alignItems: 'center',
-                      position: 'relative',
-                      cursor: 'help'
-                    }}
-                    title={`Expires in: ${getTimeRemaining(mission.active.to)}`}
-                    >
-                      <svg 
-                        width="20" 
-                        height="20" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
+
+                  {/* Mission Content */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '10px'
+                    }}>
+                      <h3 style={{ 
+                        margin: 0,
+                        color: '#333',
+                        fontSize: mission.priority === 2 ? '1em' : '1.2em',
+                        fontWeight: 'bold'
+                      }}>
+                        {mission.name || 'Unnamed Mission'}
+                      </h3>
+                    </div>
+                    
+                    {mission.description && (
+                      <p style={{ 
+                        color: '#666', 
+                        marginBottom: '15px',
+                        fontSize: mission.priority === 2 ? '0.85em' : '0.95em',
+                        lineHeight: '1.4',
+                        textAlign: 'left',
+                        cursor: mission.priority === 2 ? 'help' : 'default'
+                      }}
+                      title={mission.priority === 2 ? mission.description : undefined}
                       >
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                      </svg>
+                        {mission.priority === 2 
+                          ? mission.description.length > 100 
+                            ? `${mission.description.substring(0, 100)}...`
+                            : mission.description
+                          : mission.description}
+                      </p>
+                    )}
+
+                    {/* Mission Stats */}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '20px',
+                      marginTop: 'auto',
+                      flexWrap: 'wrap',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                        {points !== undefined && (
+                          <div style={{
+                            backgroundColor: '#646cff',
+                            color: 'white',
+                            padding: mission.priority === 2 ? '2px 6px' : '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: mission.priority === 2 ? '4px' : '6px'
+                          }}>
+                            <span style={{ fontWeight: 'bold' }}>Points:</span>
+                            <span>{points.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {credits !== undefined && (
+                          <div style={{
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            padding: mission.priority === 2 ? '2px 6px' : '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: mission.priority === 2 ? '0.75em' : '0.9em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: mission.priority === 2 ? '4px' : '6px'
+                          }}>
+                            <span style={{ fontWeight: 'bold' }}>Credits:</span>
+                            <span>{credits.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {mission.status && (
+                          <div style={{
+                            backgroundColor: '#ff9800',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.9em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <span style={{ fontWeight: 'bold' }}>Status:</span>
+                            <span>{mission.status}</span>
+                          </div>
+                        )}
+                      </div>
+                      {mission.active?.to && (
+                        <div style={{
+                          color: '#666',
+                          fontSize: '0.9em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          position: 'relative',
+                          cursor: 'help'
+                        }}
+                        title={`Expires in: ${getTimeRemaining(mission.active.to)}`}
+                        >
+                          <svg 
+                            width="20" 
+                            height="20" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div>
+          {isLoadingPrizes ? (
+            <div style={{ textAlign: 'center', color: '#666' }}>
+              Loading prizes...
+            </div>
+          ) : prizes.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#666' }}>
+              No prizes available
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '20px' }}>
+              {prizes.map((prize) => (
+                <div
+                  key={prize.id}
+                  style={{
+                    padding: '20px',
+                    backgroundColor: 'white',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    display: 'flex',
+                    gap: '20px',
+                    alignItems: 'center'
+                  }}
+                >
+                  {prize.imgUrl && (
+                    <div style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      flexShrink: 0
+                    }}>
+                      <img 
+                        src={prize.imgUrl} 
+                        alt={prize.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
                     </div>
                   )}
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>{prize.name}</h3>
+                    {prize.description && (
+                      <p style={{ color: '#666', marginBottom: '15px' }}>{prize.description}</p>
+                    )}
+                    <div style={{ display: 'flex', gap: '20px' }}>
+                      {prize.points !== undefined && (
+                        <div>
+                          <div style={{ color: '#666', fontSize: '0.9em' }}>Points Required</div>
+                          <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{prize.points.toLocaleString()}</div>
+                        </div>
+                      )}
+                      {prize.credits !== undefined && (
+                        <div>
+                          <div style={{ color: '#666', fontSize: '0.9em' }}>Credits Required</div>
+                          <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{prize.credits.toLocaleString()}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // TODO: Implement prize redemption
+                      toast.info('Prize redemption coming soon!');
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#646cff',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.9em',
+                      fontWeight: 'bold',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Redeem
+                  </button>
                 </div>
-              </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
