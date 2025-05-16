@@ -36,8 +36,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       backgroundColor: '#f5f5f5',
       display: 'flex',
       alignItems: 'center',
-      borderBottom: '2px solid #646cff',
-      opacity: 0.3
+      borderBottom: '2px solid #646cff'
     }}>
       <div style={{ 
         display: 'flex', 
