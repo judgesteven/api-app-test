@@ -60,32 +60,40 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
 
   return (
     <div style={{
-      padding: '12px 10px',
-      background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-      borderRadius: '8px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      padding: '16px 24px',
+      background: 'linear-gradient(135deg, #646cff 0%, #535bf2 100%)',
+      borderRadius: '12px',
+      boxShadow: '0 4px 12px rgba(100, 108, 255, 0.2)',
       maxWidth: '800px',
-      margin: '10px auto'
+      margin: '20px auto',
+      color: 'white',
+      width: '100%',
+      boxSizing: 'border-box'
     }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-evenly',
-        width: '100%'
+        justifyContent: 'space-between',
+        width: '100%',
+        gap: '8px',
+        flexWrap: 'wrap'
       }}>
         {/* Avatar + Name */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          flex: '0 0 auto'
+          gap: '8px',
+          flex: '0 0 auto',
+          minWidth: '120px'
         }}>
           <div style={{
-            width: '32px',
-            height: '32px',
+            width: '40px',
+            height: '40px',
             borderRadius: '50%',
             overflow: 'hidden',
-            border: '1px solid #646cff'
+            border: '2px solid white',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            flexShrink: 0
           }}>
             <img 
               src={safePlayer.avatar} 
@@ -97,31 +105,81 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
               }}
             />
           </div>
-          <h2 style={{ margin: 0, color: '#333', fontSize: '0.9em', whiteSpace: 'nowrap' }}>{safePlayer.name}</h2>
+          <h2 style={{ 
+            margin: 0, 
+            color: 'white', 
+            fontSize: '0.9em', 
+            whiteSpace: 'nowrap', 
+            textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>{safePlayer.name}</h2>
         </div>
 
-        {/* Points */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
-          <span style={{ color: '#666', fontSize: '0.7em' }}>Points:</span>
-          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.points.toLocaleString()}</span>
-        </div>
+        {/* Stats Container */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flex: '1 1 auto',
+          justifyContent: 'flex-end',
+          flexWrap: 'wrap'
+        }}>
+          {/* Points */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '4px', 
+            backgroundColor: 'rgba(255,255,255,0.1)', 
+            padding: '6px 12px', 
+            borderRadius: '6px',
+            flexShrink: 0
+          }}>
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75em' }}>Points:</span>
+            <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.points.toLocaleString()}</span>
+          </div>
 
-        {/* Credits */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
-          <span style={{ color: '#666', fontSize: '0.7em' }}>Credits:</span>
-          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.credits.toLocaleString()}</span>
-        </div>
+          {/* Credits */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '4px', 
+            backgroundColor: 'rgba(255,255,255,0.1)', 
+            padding: '6px 12px', 
+            borderRadius: '6px',
+            flexShrink: 0
+          }}>
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75em' }}>Credits:</span>
+            <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.credits.toLocaleString()}</span>
+          </div>
 
-        {/* Level */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
-          <span style={{ color: '#666', fontSize: '0.7em' }}>Level:</span>
-          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.level}</span>
-        </div>
+          {/* Level */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '4px', 
+            backgroundColor: 'rgba(255,255,255,0.1)', 
+            padding: '6px 12px', 
+            borderRadius: '6px',
+            flexShrink: 0
+          }}>
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75em' }}>Level:</span>
+            <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.level}</span>
+          </div>
 
-        {/* Team */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
-          <span style={{ color: '#666', fontSize: '0.7em' }}>Team:</span>
-          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.team}</span>
+          {/* Team */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '4px', 
+            backgroundColor: 'rgba(255,255,255,0.1)', 
+            padding: '6px 12px', 
+            borderRadius: '6px',
+            flexShrink: 0
+          }}>
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75em' }}>Team:</span>
+            <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.team}</span>
+          </div>
         </div>
       </div>
     </div>
