@@ -5,6 +5,7 @@ import Missions from './components/Missions'
 import './App.css'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import Footer from './components/Footer'
 
 interface Player {
   id: string;
@@ -50,6 +51,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isStored, setIsStored] = useState(!!(savedAccount && savedApiKey));
   const [playerProfile, setPlayerProfile] = useState<any>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
 
   const fetchData = async () => {
     if (!formData.account || !formData.apiKey) {
@@ -301,29 +303,46 @@ function App() {
     }
   };
 
+  const handlePlayerSelect = (player: any) => {
+    setSelectedPlayer(player);
+  };
+
   return (
-    <div className="App">
-      <InputSection 
-        onInputChange={handleInputChange} 
-        onSubmit={handleSubmit}
-        players={players}
-        isLoading={isLoading}
-        account={formData.account}
-        apiKey={formData.apiKey}
-        onStore={handleStore}
-        isStored={isStored}
-        selectedPlayerId={formData.player}
-      />
-      {playerProfile && <PlayerProfile player={playerProfile} isLoading={false} teams={teams} />}
-      <Missions 
-        missions={missions} 
-        events={events}
-        isLoading={isLoading} 
-        playerProfile={playerProfile}
-        onRefresh={refreshData}
-        apiKey={formData.apiKey}
-      />
-      <ToastContainer />
+    <div style={{ 
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <div style={{ flex: '1 0 auto' }}>
+        <div style={{ 
+          padding: '20px',
+          maxWidth: '1200px',
+          margin: '0 auto'
+        }}>
+          <InputSection 
+            onInputChange={handleInputChange} 
+            onSubmit={handleSubmit}
+            players={players}
+            isLoading={isLoading} 
+            account={formData.account}
+            apiKey={formData.apiKey}
+            onStore={handleStore}
+            isStored={isStored}
+            selectedPlayerId={formData.player}
+          />
+          {playerProfile && <PlayerProfile player={playerProfile} isLoading={false} teams={teams} />}
+          <Missions 
+            missions={missions} 
+            events={events}
+            isLoading={isLoading}
+            playerProfile={playerProfile}
+            onRefresh={refreshData}
+            apiKey={formData.apiKey}
+          />
+          <ToastContainer />
+        </div>
+      </div>
+      <Footer />
     </div>
   );
 }
