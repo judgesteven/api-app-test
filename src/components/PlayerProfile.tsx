@@ -60,58 +60,68 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
 
   return (
     <div style={{
-      padding: '20px',
-      backgroundColor: 'white',
+      padding: '12px 10px',
+      background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
       borderRadius: '8px',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      maxWidth: '600px',
-      margin: '20px auto'
+      maxWidth: '800px',
+      margin: '10px auto'
     }}>
       <div style={{
         display: 'flex',
-        gap: '20px',
-        alignItems: 'center'
+        alignItems: 'center',
+        justifyContent: 'space-evenly',
+        width: '100%'
       }}>
+        {/* Avatar + Name */}
         <div style={{
-          width: '100px',
-          height: '100px',
-          borderRadius: '50%',
-          overflow: 'hidden',
-          border: '2px solid #646cff'
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flex: '0 0 auto'
         }}>
-          <img 
-            src={safePlayer.avatar} 
-            alt={`${safePlayer.name}'s avatar`}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
-            }}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ margin: '0 0 10px 0', color: '#333' }}>{safePlayer.name}</h2>
-          {safePlayer.description && (
-            <p style={{ color: '#666', marginBottom: '15px' }}>{safePlayer.description}</p>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-            <div>
-              <div style={{ color: '#666', fontSize: '0.9em' }}>Level</div>
-              <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{safePlayer.level}</div>
-            </div>
-            <div>
-              <div style={{ color: '#666', fontSize: '0.9em' }}>Team</div>
-              <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{safePlayer.team}</div>
-            </div>
-            <div>
-              <div style={{ color: '#666', fontSize: '0.9em' }}>Points</div>
-              <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{safePlayer.points.toLocaleString()}</div>
-            </div>
-            <div>
-              <div style={{ color: '#666', fontSize: '0.9em' }}>Credits</div>
-              <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{safePlayer.credits.toLocaleString()}</div>
-            </div>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: '1px solid #646cff'
+          }}>
+            <img 
+              src={safePlayer.avatar} 
+              alt={`${safePlayer.name}'s avatar`}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
+            />
           </div>
+          <h2 style={{ margin: 0, color: '#333', fontSize: '0.9em', whiteSpace: 'nowrap' }}>{safePlayer.name}</h2>
+        </div>
+
+        {/* Points */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
+          <span style={{ color: '#666', fontSize: '0.7em' }}>Points:</span>
+          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.points.toLocaleString()}</span>
+        </div>
+
+        {/* Credits */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
+          <span style={{ color: '#666', fontSize: '0.7em' }}>Credits:</span>
+          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.credits.toLocaleString()}</span>
+        </div>
+
+        {/* Level */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
+          <span style={{ color: '#666', fontSize: '0.7em' }}>Level:</span>
+          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.level}</span>
+        </div>
+
+        {/* Team */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto' }}>
+          <span style={{ color: '#666', fontSize: '0.7em' }}>Team:</span>
+          <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{safePlayer.team}</span>
         </div>
       </div>
     </div>
