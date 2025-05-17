@@ -321,6 +321,7 @@ function App() {
         isLoading={isLoading} 
         playerProfile={playerProfile}
         onRefresh={refreshData}
+        apiKey={formData.apiKey}
       />
       <ToastContainer />
     </div>
