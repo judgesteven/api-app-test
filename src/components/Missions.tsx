@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 
 interface Mission {
@@ -141,6 +141,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   const [grantedAchievements, setGrantedAchievements] = useState<GrantedAchievement[]>([]);
   const [redeemedPrizes, setRedeemedPrizes] = useState<RedeemedPrize[]>([]);
   const [isLoadingPlayerHistory, setIsLoadingPlayerHistory] = useState(false);
+  const [playerAvatars, setPlayerAvatars] = useState<Record<string, string>>({});
 
   // Add a helper function to safely get string values
   const getStringValue = (value: any): string => {
@@ -399,11 +400,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       const data = await response.json();
       console.log('Leaderboard data from API:', data);
       // Defensive: always set leaderboard to an array
-      const entries = Array.isArray(data)
-        ? data
-        : Array.isArray(data.leaderboard)
-          ? data.leaderboard
-          : [];
+      const entries = Array.isArray(data?.scores?.data)
+        ? data.scores.data
+        : [];
       setLeaderboard(entries);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -565,6 +564,38 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       setIsLoadingPlayerHistory(false);
     }
   };
+
+  // Fetch avatars for leaderboard players
+  useEffect(() => {
+    const fetchAvatars = async () => {
+      const account = localStorage.getItem('account');
+      const apiKey = localStorage.getItem('apiKey');
+      if (!leaderboard.length || !account || !apiKey) return;
+      const newAvatars: Record<string, string> = {};
+      await Promise.all(
+        leaderboard.map(async (entry: any) => {
+          if (!entry.player) return;
+          try {
+            const res = await fetch(`https://api.gamelayer.co/api/v0/players/${encodeURIComponent(entry.player)}?account=${encodeURIComponent(account)}`, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'api-key': apiKey
+              }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.imgUrl) newAvatars[entry.player] = data.imgUrl;
+            }
+          } catch (e) {
+            // Ignore errors, fallback to placeholder
+          }
+        })
+      );
+      setPlayerAvatars((prev) => ({ ...prev, ...newAvatars }));
+    };
+    fetchAvatars();
+  }, [leaderboard]);
 
   React.useEffect(() => {
     if (activeTab === 'awards') {
@@ -1405,42 +1436,38 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             {index + 1}
                           </div>
 
-                          {/* Player Avatar */}
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            overflow: 'hidden',
-                            border: '2px solid #646cff'
-                          }}>
-                            <img 
-                              src={entry.avatar || 'https://placehold.co/40x40?text=Player'} 
-                              alt={`${entry.name}'s avatar`}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover'
-                              }}
-                            />
-                          </div>
-
-                          {/* Player Info */}
-                          <div style={{ flex: 1 }}>
+                          {/* Player Avatar and Name */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              overflow: 'hidden',
+                              border: '2px solid #646cff',
+                              flexShrink: 0
+                            }}>
+                              <img 
+                                src={playerAvatars[entry.player] || 'https://placehold.co/40x40?text=Player'} 
+                                alt={`${entry.name}'s avatar`}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            </div>
                             <h3 style={{ 
                               margin: 0,
                               color: isCurrentPlayer ? '#646cff' : '#333',
                               fontSize: '1.1em',
-                              fontWeight: 'bold'
+                              fontWeight: 'bold',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: 160
                             }}>
                               {entry.name}
                             </h3>
-                            <p style={{ 
-                              margin: '4px 0 0 0',
-                              color: '#666',
-                              fontSize: '0.9em'
-                            }}>
-                              {entry.team || 'No Team'}
-                            </p>
                           </div>
 
                           {/* Points */}
@@ -1453,10 +1480,10 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             fontWeight: 'bold',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px'
+                            gap: '8px',
+                            marginLeft: 'auto'
                           }}>
-                            <span>Points:</span>
-                            <span>{entry.points?.toLocaleString() || 0}</span>
+                            <span>{entry.scores?.toLocaleString() ?? 0}</span>
                           </div>
                         </div>
                       );
