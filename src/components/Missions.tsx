@@ -90,10 +90,22 @@ interface RedeemedPrize {
   name: string;
   redeemed_at: string;
   credits_spent: number;
+  credits?: number;
+  redemptions?: Array<{
+    credits_spent?: number;
+    credits?: number;
+    redeemed_at?: string;
+  }>;
+  count?: number;
+  actions?: {
+    count?: number;
+    firstCompletedOn?: string;
+    completedOn?: string;
+  };
 }
 
 const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, playerProfile, onRefresh, apiKey }) => {
-  const [activeTab, setActiveTab] = useState<'missions' | 'prizes' | 'leaderboard' | 'awards' | 'player'>('missions');
+  const [activeTab, setActiveTab] = useState<'missions' | 'prizes' | 'leaderboard' | 'player' | 'awards'>('missions');
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -308,11 +320,53 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       }
 
       const data = await response.json();
-      console.log('Achievements data from API:', data);
-      setAchievements(Array.isArray(data) ? data : []);
+      console.log('Raw achievements data:', data);
+      let grantedAchievementsData: any[] = [];
+      if (data && data.achievements && Array.isArray(data.achievements.completed)) {
+        grantedAchievementsData = data.achievements.completed;
+      } else if (Array.isArray(data)) {
+        grantedAchievementsData = data.filter((achievement: any) => achievement.status === 'granted');
+      }
+      console.log('Filtered granted achievements:', grantedAchievementsData);
+      setGrantedAchievements(grantedAchievementsData);
     } catch (error) {
       console.error('Error fetching achievements:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to fetch achievements');
+    } finally {
+      setIsLoadingAchievements(false);
+    }
+  };
+
+  const fetchAllAchievements = async () => {
+    const apiKey = localStorage.getItem('apiKey');
+    const account = localStorage.getItem('account');
+    if (!apiKey || !account) {
+      console.error('Missing required data:', { hasApiKey: !!apiKey, hasAccount: !!account });
+      toast.error('API key or account is missing');
+      return;
+    }
+    setIsLoadingAchievements(true);
+    try {
+      const response = await fetch(`https://api.gamelayer.co/api/v0/achievements?account=${encodeURIComponent(account)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": apiKey
+        }
+      });
+      if (response.status === 401) {
+        throw new Error('Unauthorized: Please check your API key');
+      }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to fetch all achievements: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log('[DEBUG] All account achievements:', data);
+      setAchievements(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching all achievements:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch all achievements');
     } finally {
       setIsLoadingAchievements(false);
     }
@@ -460,14 +514,17 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
 
       const achievementsData = await achievementsResponse.json();
       console.log('Raw achievements data:', achievementsData);
-      const grantedAchievementsData = Array.isArray(achievementsData)
-        ? achievementsData.filter((achievement: any) => achievement.status === 'granted')
-        : [];
+      let grantedAchievementsData: any[] = [];
+      if (achievementsData && achievementsData.achievements && Array.isArray(achievementsData.achievements.completed)) {
+        grantedAchievementsData = achievementsData.achievements.completed;
+      } else if (Array.isArray(achievementsData)) {
+        grantedAchievementsData = achievementsData.filter((achievement: any) => achievement.status === 'granted');
+      }
       console.log('Filtered granted achievements:', grantedAchievementsData);
       setGrantedAchievements(grantedAchievementsData);
 
-      // Fetch player prizes
-      const prizesUrl = `https://api.gamelayer.co/api/v0/players/${playerId}/prizes/redeemed?account=${encodeURIComponent(account)}`;
+      // Fetch player redeemed prizes (per GameLayer docs)
+      const prizesUrl = `https://api.gamelayer.co/api/v0/players/${playerId}/prizes?account=${encodeURIComponent(account)}`;
       console.log('Fetching redeemed prizes from:', prizesUrl);
       
       const prizesResponse = await fetch(prizesUrl, {
@@ -487,39 +544,18 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       if (!prizesResponse.ok) {
         const errorText = await prizesResponse.text();
         console.error('Prizes error response:', errorText);
-        throw new Error(`Failed to fetch prizes: ${prizesResponse.status} ${prizesResponse.statusText}`);
+        throw new Error(`Failed to fetch redeemed prizes: ${prizesResponse.status} ${prizesResponse.statusText}`);
       }
 
-      const prizesData = await prizesResponse.json();
-      console.log('Raw redeemed prizes data:', prizesData);
-      
-      let redeemedPrizesData = [];
-      
-      // Process redeemed prizes
-      if (Array.isArray(prizesData)) {
-        redeemedPrizesData = prizesData.map((prize: any) => ({
-          id: prize.id,
-          name: prize.name,
-          redeemed_at: prize.redeemed_at,
-          credits_spent: prize.credits_spent
-        }));
-      } else if (prizesData?.prizes && Array.isArray(prizesData.prizes)) {
-        redeemedPrizesData = prizesData.prizes.map((prize: any) => ({
-          id: prize.id,
-          name: prize.name,
-          redeemed_at: prize.redeemed_at,
-          credits_spent: prize.credits_spent
-        }));
-      }
-      
-      console.log('Processed redeemed prizes:', redeemedPrizesData);
-      setRedeemedPrizes(redeemedPrizesData);
+      const data = await prizesResponse.json();
+      console.log('[DEBUG] Redeemed prizes API response:', data);
+      setRedeemedPrizes(Array.isArray(data.prizes) ? data.prizes : []);
 
       // Log final state
       console.log('Final state after fetching:', {
         completedMissions: completedMissionsData,
         grantedAchievements: grantedAchievementsData,
-        redeemedPrizes: redeemedPrizesData
+        redeemedPrizes: data.prizes
       });
 
     } catch (error) {
@@ -531,7 +567,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   };
 
   React.useEffect(() => {
-    if (activeTab === 'prizes' && playerProfile?.player_id) {
+    if (activeTab === 'awards') {
+      fetchAllAchievements();
+    } else if (activeTab === 'prizes' && playerProfile?.player_id) {
       fetchPrizes();
     } else if (activeTab === 'awards' && playerProfile?.player_id) {
       fetchAchievements();
@@ -549,6 +587,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       </div>
     );
   }
+
+  console.log('[DEBUG] RedeemedPrizes for table:', redeemedPrizes);
+  redeemedPrizes.forEach((prize, idx) => console.log(`[DEBUG] Prize[${idx}]:`, prize));
 
   return (
     <div style={{ padding: '20px' }}>
@@ -1541,59 +1582,6 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                                 : achievement.description}
                             </p>
                           )}
-
-                          {/* Achievement Stats */}
-                          <div style={{ 
-                            display: 'flex', 
-                            gap: '10px',
-                            marginTop: 'auto',
-                            flexWrap: 'wrap',
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                          }}>
-                            {achievement.progress !== undefined && (
-                              <div style={{
-                                backgroundColor: '#646cff',
-                                color: 'white',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '0.8em',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.3s ease',
-                                transform: hoveredBadge === `progress-${achievement.id}` ? 'scale(1.05)' : 'scale(1)',
-                                boxShadow: hoveredBadge === `progress-${achievement.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-                              }}
-                              onMouseEnter={() => setHoveredBadge(`progress-${achievement.id}`)}
-                              onMouseLeave={() => setHoveredBadge(null)}
-                              >
-                                <span style={{ fontWeight: 'bold' }}>Progress:</span>
-                                <span>{achievement.progress.toLocaleString()}%</span>
-                              </div>
-                            )}
-                            {achievement.total !== undefined && (
-                              <div style={{
-                                backgroundColor: '#4CAF50',
-                                color: 'white',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '0.8em',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.3s ease',
-                                transform: hoveredBadge === `total-${achievement.id}` ? 'scale(1.05)' : 'scale(1)',
-                                boxShadow: hoveredBadge === `total-${achievement.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-                              }}
-                              onMouseEnter={() => setHoveredBadge(`total-${achievement.id}`)}
-                              onMouseLeave={() => setHoveredBadge(null)}
-                              >
-                                <span style={{ fontWeight: 'bold' }}>Total:</span>
-                                <span>{achievement.total.toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
                         </div>
                       </div>
                     );
@@ -1682,25 +1670,34 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     flexDirection: 'column',
                     gap: '10px'
                   }}>
-                    {grantedAchievements.map((achievement) => (
-                      <div
-                        key={achievement.id}
-                        style={{
-                          padding: '15px',
-                          border: '1px solid #e0e0e0',
-                          borderRadius: '8px',
-                          backgroundColor: '#f8f8f8',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <span style={{ fontWeight: 'bold' }}>{achievement.name}</span>
-                        <span style={{ color: '#666' }}>
-                          {new Date(achievement.granted_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    ))}
+                    <table style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}>
+                      <thead>
+                        <tr>
+                          <th style={{ fontWeight: 'bold', padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0' }}>Name</th>
+                          <th style={{ color: '#666', padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Status</th>
+                          <th style={{ color: '#666', padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {grantedAchievements.map((achievement: any) => {
+                          const date = achievement.granted_at || achievement.actions?.completedOn;
+                          return (
+                            <tr key={achievement.id} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                              <td style={{ padding: '12px', textAlign: 'left' }}>{achievement.name}</td>
+                              <td style={{ color: '#666', padding: '12px', textAlign: 'center' }}>{achievement.status ?? 'granted'}</td>
+                              <td style={{ color: '#666', padding: '12px', textAlign: 'center' }}>{date ? new Date(date).toLocaleDateString() : '-'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
@@ -1718,20 +1715,27 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     <thead>
                       <tr>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0' }}>Name</th>
-                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Credits</th>
-                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Redeemed</th>
+                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Credits Used</th>
+                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Redemptions</th>
+                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>First Redeemed</th>
+                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Last Redeemed</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {redeemedPrizes.map((prize) => (
-                        <tr key={prize.id} style={{ borderBottom: '1px solid #e0e0e0' }}>
-                          <td style={{ padding: '12px', textAlign: 'left' }}>{prize.name}</td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>{prize.credits_spent}</td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            {prize.redeemed_at ? new Date(prize.redeemed_at).toLocaleDateString() : '-'}
-                          </td>
-                        </tr>
-                      ))}
+                      {(redeemedPrizes || []).map((prize) => {
+                        const count = prize.actions?.count ?? 1;
+                        const creditsPerRedemption = prize.credits_spent ?? prize.credits ?? 0;
+                        const totalCreditsUsed = creditsPerRedemption * count;
+                        return (
+                          <tr key={prize.id} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                            <td style={{ padding: '12px', textAlign: 'left' }}>{prize.name}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{totalCreditsUsed || '-'}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{count}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{prize.actions?.firstCompletedOn ? new Date(prize.actions.firstCompletedOn).toLocaleDateString() : '-'}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{prize.actions?.completedOn ? new Date(prize.actions.completedOn).toLocaleDateString() : '-'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
