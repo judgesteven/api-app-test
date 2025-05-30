@@ -1384,7 +1384,8 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                 <div style={{ 
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '10px'
+                  gap: '20px',
+                  alignItems: 'stretch'
                 }}>
                   {leaderboard.length === 0 ? (
                     <div style={{
@@ -1406,19 +1407,39 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                         <div
                           key={entry.player_id}
                           style={{
-                            padding: '15px',
-                            border: `1px solid ${isCurrentPlayer ? '#646cff' : '#e0e0e0'}`,
-                            borderRadius: '12px',
-                            backgroundColor: isCurrentPlayer ? '#f0f0ff' : '#f8f8f8',
+                            padding: '12px 18px',
+                            border: isCurrentPlayer
+                              ? '2.5px solid #646cff'
+                              : (hoveredCard === entry.player_id ? '2px solid #aab6ff' : '1.5px solid #e0e0e0'),
+                            borderRadius: '16px',
+                            background: isCurrentPlayer
+                              ? 'linear-gradient(90deg, #e6eaff 0%, #f0f0ff 100%)'
+                              : '#fff',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '15px',
-                            transition: 'all 0.3s ease',
-                            transform: hoveredCard === entry.player_id ? 'translateY(-2px)' : 'translateY(0)',
-                            boxShadow: hoveredCard === entry.player_id ? '0 4px 8px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)'
+                            gap: '14px',
+                            transition: 'box-shadow 0.25s cubic-bezier(0.4,0,0.2,1), border 0.25s cubic-bezier(0.4,0,0.2,1), transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+                            transform: !isCurrentPlayer && hoveredCard === entry.player_id ? 'translateY(-3px) scale(1.025)' : 'translateY(0) scale(1)',
+                            boxShadow: isCurrentPlayer
+                              ? '0 2px 8px rgba(100,108,255,0.10), 0 1px 4px rgba(100,108,255,0.08)'
+                              : hoveredCard === entry.player_id
+                                ? '0 6px 18px rgba(100,108,255,0.13), 0 2px 8px rgba(0,0,0,0.10)'
+                                : '0 1px 3px rgba(0,0,0,0.04)',
+                            cursor: isCurrentPlayer ? 'default' : 'pointer',
+                            outline: isCurrentPlayer ? '2px solid #646cff33' : 'none',
+                            minHeight: '48px',
+                            position: 'relative',
                           }}
-                          onMouseEnter={() => setHoveredCard(entry.player_id)}
-                          onMouseLeave={() => setHoveredCard(null)}
+                          onMouseEnter={() => {
+                            if (!isCurrentPlayer) {
+                              setHoveredCard(entry.player_id);
+                              console.log('Hovered leaderboard card:', entry.player_id);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredCard(null);
+                            console.log('Unhovered leaderboard card:', entry.player_id);
+                          }}
                         >
                           {/* Rank */}
                           <div style={{
@@ -1481,7 +1502,10 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            marginLeft: 'auto'
+                            marginLeft: 'auto',
+                            minWidth: '72px',
+                            maxWidth: '72px',
+                            justifyContent: 'center',
                           }}>
                             <span>{entry.scores?.toLocaleString() ?? 0}</span>
                           </div>
