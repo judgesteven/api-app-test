@@ -320,35 +320,37 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
 
   const fetchLeaderboard = async () => {
     const account = localStorage.getItem('account');
-    
     if (!apiKey || !account) {
       console.error('Missing required data:', { hasApiKey: !!apiKey, hasAccount: !!account });
       toast.error('API key or account is missing');
       return;
     }
-
     setIsLoadingLeaderboard(true);
     try {
-      const response = await fetch(`https://api.gamelayer.co/api/v0/leaderboard?account=${encodeURIComponent(account)}`, {
+      // Use the correct leaderboard endpoint and id
+      const response = await fetch(`https://api.gamelayer.co/api/v0/leaderboards/1-test-leaderboard?account=${encodeURIComponent(account)}`, {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
           "api-key": apiKey
         }
       });
-
       if (response.status === 401) {
         throw new Error('Unauthorized: Please check your API key');
       }
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         throw new Error(errorData?.message || `Failed to fetch leaderboard: ${response.status} ${response.statusText}`);
       }
-
       const data = await response.json();
       console.log('Leaderboard data from API:', data);
-      setLeaderboard(Array.isArray(data) ? data : []);
+      // Defensive: always set leaderboard to an array
+      const entries = Array.isArray(data)
+        ? data
+        : Array.isArray(data.leaderboard)
+          ? data.leaderboard
+          : [];
+      setLeaderboard(entries);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to fetch leaderboard');
@@ -1184,8 +1186,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                                 cursor: 'pointer',
                                 transition: 'all 0.3s ease',
                                 transform: hoveredButton === `claim-${prize.id}` ? 'scale(1.05)' : 'scale(1)',
-                                boxShadow: hoveredButton === `claim-${prize.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-                                backgroundColor: hoveredButton === `claim-${prize.id}` ? '#535bf2' : '#646cff'
+                                boxShadow: hoveredButton === `claim-${prize.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
                               }}
                               onMouseEnter={() => setHoveredButton(`claim-${prize.id}`)}
                               onMouseLeave={() => setHoveredButton(null)}
@@ -1313,98 +1314,113 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   flexDirection: 'column',
                   gap: '10px'
                 }}>
-                  {leaderboard.map((entry, index) => {
-                    const isCurrentPlayer = entry.player_id === playerProfile?.player_id;
-                    return (
-                      <div
-                        key={entry.player_id}
-                        style={{
-                          padding: '15px',
-                          border: `1px solid ${isCurrentPlayer ? '#646cff' : '#e0e0e0'}`,
-                          borderRadius: '12px',
-                          backgroundColor: isCurrentPlayer ? '#f0f0ff' : '#f8f8f8',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '15px',
-                          transition: 'all 0.3s ease',
-                          transform: hoveredCard === entry.player_id ? 'translateY(-2px)' : 'translateY(0)',
-                          boxShadow: hoveredCard === entry.player_id ? '0 4px 8px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)'
-                        }}
-                        onMouseEnter={() => setHoveredCard(entry.player_id)}
-                        onMouseLeave={() => setHoveredCard(null)}
-                      >
-                        {/* Rank */}
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          backgroundColor: index < 3 ? ['#FFD700', '#C0C0C0', '#CD7F32'][index] : '#e0e0e0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: index < 3 ? 'white' : '#666',
-                          fontWeight: 'bold',
-                          fontSize: '1.2em'
-                        }}>
-                          {index + 1}
-                        </div>
+                  {leaderboard.length === 0 ? (
+                    <div style={{
+                      textAlign: 'center',
+                      color: '#888',
+                      padding: '40px 0',
+                      fontSize: '1.1em',
+                      fontWeight: 500
+                    }}>
+                      No players on the leaderboard yet.<br />
+                      <span style={{ fontSize: '0.9em', color: '#aaa' }}>
+                        Players will appear here as soon as they earn points.
+                      </span>
+                    </div>
+                  ) : (
+                    leaderboard.map((entry, index) => {
+                      const isCurrentPlayer = entry.player_id === playerProfile?.player_id;
+                      return (
+                        <div
+                          key={entry.player_id}
+                          style={{
+                            padding: '15px',
+                            border: `1px solid ${isCurrentPlayer ? '#646cff' : '#e0e0e0'}`,
+                            borderRadius: '12px',
+                            backgroundColor: isCurrentPlayer ? '#f0f0ff' : '#f8f8f8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '15px',
+                            transition: 'all 0.3s ease',
+                            transform: hoveredCard === entry.player_id ? 'translateY(-2px)' : 'translateY(0)',
+                            boxShadow: hoveredCard === entry.player_id ? '0 4px 8px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)'
+                          }}
+                          onMouseEnter={() => setHoveredCard(entry.player_id)}
+                          onMouseLeave={() => setHoveredCard(null)}
+                        >
+                          {/* Rank */}
+                          <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            backgroundColor: index < 3 ? ['#FFD700', '#C0C0C0', '#CD7F32'][index] : '#e0e0e0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: index < 3 ? 'white' : '#666',
+                            fontWeight: 'bold',
+                            fontSize: '1.2em'
+                          }}>
+                            {index + 1}
+                          </div>
 
-                        {/* Player Avatar */}
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          overflow: 'hidden',
-                          border: '2px solid #646cff'
-                        }}>
-                          <img 
-                            src={entry.avatar || 'https://placehold.co/40x40?text=Player'} 
-                            alt={`${entry.name}'s avatar`}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover'
-                            }}
-                          />
-                        </div>
+                          {/* Player Avatar */}
+                          <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            border: '2px solid #646cff'
+                          }}>
+                            <img 
+                              src={entry.avatar || 'https://placehold.co/40x40?text=Player'} 
+                              alt={`${entry.name}'s avatar`}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                            />
+                          </div>
 
-                        {/* Player Info */}
-                        <div style={{ flex: 1 }}>
-                          <h3 style={{ 
-                            margin: 0,
-                            color: isCurrentPlayer ? '#646cff' : '#333',
+                          {/* Player Info */}
+                          <div style={{ flex: 1 }}>
+                            <h3 style={{ 
+                              margin: 0,
+                              color: isCurrentPlayer ? '#646cff' : '#333',
+                              fontSize: '1.1em',
+                              fontWeight: 'bold'
+                            }}>
+                              {entry.name}
+                            </h3>
+                            <p style={{ 
+                              margin: '4px 0 0 0',
+                              color: '#666',
+                              fontSize: '0.9em'
+                            }}>
+                              {entry.team || 'No Team'}
+                            </p>
+                          </div>
+
+                          {/* Points */}
+                          <div style={{
+                            backgroundColor: '#646cff',
+                            color: 'white',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
                             fontSize: '1.1em',
-                            fontWeight: 'bold'
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
                           }}>
-                            {entry.name}
-                          </h3>
-                          <p style={{ 
-                            margin: '4px 0 0 0',
-                            color: '#666',
-                            fontSize: '0.9em'
-                          }}>
-                            {entry.team || 'No Team'}
-                          </p>
+                            <span>Points:</span>
+                            <span>{entry.points?.toLocaleString() || 0}</span>
+                          </div>
                         </div>
-
-                        {/* Points */}
-                        <div style={{
-                          backgroundColor: '#646cff',
-                          color: 'white',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          fontSize: '1.1em',
-                          fontWeight: 'bold',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          <span>Points:</span>
-                          <span>{entry.points?.toLocaleString() || 0}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}

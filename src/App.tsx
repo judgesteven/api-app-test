@@ -3,7 +3,7 @@ import InputSection from './components/InputSection'
 import PlayerProfile from './components/PlayerProfile'
 import Missions from './components/Missions'
 import './App.css'
-import { ToastContainer } from 'react-toastify'
+import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Footer from './components/Footer'
 
@@ -63,6 +63,19 @@ function App() {
     setIsLoading(true);
 
     try {
+      // Log the request details for successful API call
+      console.log('Fetching players with request:', {
+        url: `https://api.gamelayer.co/api/v0/players?account=${encodeURIComponent(formData.account)}`,
+        method: 'GET',
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": formData.apiKey.substring(0, 4) + '...'
+        },
+        account: formData.account,
+        apiKeyLength: formData.apiKey.length
+      });
+
       // Fetch players
       const playersResponse = await fetch(`https://api.gamelayer.co/api/v0/players?account=${encodeURIComponent(formData.account)}`, {
         headers: {
@@ -70,6 +83,12 @@ function App() {
           "Accept": "application/json",
           "api-key": formData.apiKey
         }
+      });
+
+      console.log('Players API Response:', {
+        status: playersResponse.status,
+        statusText: playersResponse.statusText,
+        headers: Object.fromEntries(playersResponse.headers.entries())
       });
 
       if (!playersResponse.ok) {
@@ -278,9 +297,32 @@ function App() {
 
   const handleStore = () => {
     if (formData.account && formData.apiKey) {
+      // Store in localStorage
       localStorage.setItem('account', formData.account);
       localStorage.setItem('apiKey', formData.apiKey);
-      setIsStored(true);
+      
+      // Verify storage
+      const storedApiKey = localStorage.getItem('apiKey');
+      const storedAccount = localStorage.getItem('account');
+      
+      console.log('Storing credentials:', {
+        account: formData.account,
+        apiKeyLength: formData.apiKey.length,
+        storedApiKeyLength: storedApiKey?.length,
+        storedAccount,
+        isStored: !!(storedApiKey && storedAccount)
+      });
+      
+      if (storedApiKey === formData.apiKey && storedAccount === formData.account) {
+        setIsStored(true);
+        toast.success('Credentials stored successfully');
+      } else {
+        console.error('Storage verification failed:', {
+          apiKeyMatch: storedApiKey === formData.apiKey,
+          accountMatch: storedAccount === formData.account
+        });
+        toast.error('Failed to store credentials properly');
+      }
     }
   };
 
@@ -307,6 +349,137 @@ function App() {
     setSelectedPlayer(player);
   };
 
+  const handleAddPlayer = async (playerData: { name: string; avatar: string; imgUrl: string; playerId: string }) => {
+    // Log the current state of the API key
+    console.log('Add Player - Current State:', {
+      formDataApiKey: formData.apiKey ? 'Present' : 'Missing',
+      formDataApiKeyLength: formData.apiKey?.length,
+      localStorageApiKey: localStorage.getItem('apiKey') ? 'Present' : 'Missing',
+      localStorageApiKeyLength: localStorage.getItem('apiKey')?.length,
+      isStored,
+      account: formData.account
+    });
+
+    if (!formData.account || !formData.apiKey) {
+      toast.error('Please enter account details and API key first');
+      return;
+    }
+
+    if (!isStored) {
+      toast.error('Please store your API key first by clicking the Store button');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // 1. Check if player ID exists
+      const checkUrl = `https://api.gamelayer.co/api/v0/players/${encodeURIComponent(playerData.playerId)}?account=${encodeURIComponent(formData.account)}`;
+      const checkResponse = await fetch(checkUrl, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": formData.apiKey
+        }
+      });
+      if (checkResponse.ok) {
+        // Player exists
+        toast.error('Player ID already exists. Please choose a different ID.');
+        setIsLoading(false);
+        return;
+      } else if (checkResponse.status !== 404) {
+        // Some other error
+        toast.error('Failed to check player ID. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Create player if not found
+      const requestBody = {
+        account: formData.account,
+        name: playerData.name,
+        avatar: playerData.avatar,
+        imgUrl: playerData.imgUrl,
+        player: playerData.playerId
+      };
+
+      // Log the exact request being made
+      console.log('Creating player with request:', {
+        url: 'https://api.gamelayer.co/api/v0/players',
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": formData.apiKey.substring(0, 4) + '...'
+        },
+        body: requestBody,
+        account: formData.account,
+        apiKeyLength: formData.apiKey.length,
+        isStored
+      });
+
+      const response = await fetch('https://api.gamelayer.co/api/v0/players', {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": formData.apiKey
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        responseData = null;
+        console.error('Failed to parse response as JSON:', e);
+      }
+
+      console.log('Add Player API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        data: responseData,
+        requestUrl: response.url
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Log additional details for 401 error
+          console.error('401 Unauthorized - Details:', {
+            apiKeyLength: formData.apiKey.length,
+            apiKeyPrefix: formData.apiKey.substring(0, 4),
+            account: formData.account,
+            isStored,
+            localStorageApiKey: localStorage.getItem('apiKey')?.substring(0, 4) + '...'
+          });
+          throw new Error('Invalid API key. Please check your API key and try again.');
+        }
+        const errorMessage = responseData?.message || responseData?.error || `Failed to add player: ${response.status} ${response.statusText}`;
+        throw new Error(errorMessage);
+      }
+
+      // Transform the response data to match our Player interface
+      const newPlayer = {
+        id: responseData?.player_id || playerData.playerId,
+        name: responseData?.name || playerData.name,
+        player: responseData?.player_id || playerData.playerId
+      };
+
+      setPlayers(prevPlayers => [...prevPlayers, newPlayer]);
+      toast.success('Player added successfully!');
+      
+      // Refresh the players list
+      await fetchData();
+    } catch (err) {
+      console.error('Error adding player:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to add player');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh',
@@ -329,6 +502,7 @@ function App() {
             onStore={handleStore}
             isStored={isStored}
             selectedPlayerId={formData.player}
+            onAddPlayer={handleAddPlayer}
           />
           {playerProfile && <PlayerProfile player={playerProfile} isLoading={false} teams={teams} />}
           <Missions 
