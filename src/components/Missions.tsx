@@ -602,8 +602,6 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       fetchAllAchievements();
     } else if (activeTab === 'prizes' && playerProfile?.player_id) {
       fetchPrizes();
-    } else if (activeTab === 'awards' && playerProfile?.player_id) {
-      fetchAchievements();
     } else if (activeTab === 'leaderboard') {
       fetchLeaderboard();
     } else if (activeTab === 'player' && playerProfile?.player_id) {
