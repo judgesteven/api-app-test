@@ -105,7 +105,7 @@ interface RedeemedPrize {
 }
 
 const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, playerProfile, onRefresh, apiKey }) => {
-  const [activeTab, setActiveTab] = useState<'missions' | 'prizes' | 'leaderboard' | 'player' | 'awards'>('missions');
+  const [activeTab, setActiveTab] = useState<'missions' | 'quizzes' | 'prizes' | 'leaderboard' | 'player' | 'awards'>('missions');
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -142,6 +142,14 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   const [redeemedPrizes, setRedeemedPrizes] = useState<RedeemedPrize[]>([]);
   const [isLoadingPlayerHistory, setIsLoadingPlayerHistory] = useState(false);
   const [playerAvatars, setPlayerAvatars] = useState<Record<string, string>>({});
+  const [quiz, setQuiz] = useState<any>(null);
+  const [activeQuiz, setActiveQuiz] = useState<any>(null); // <-- new state for modal
+  const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
+  const [quizModalOpen, setQuizModalOpen] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [isStartingQuiz, setIsStartingQuiz] = useState(false);
+  const [quizSlug, setQuizSlug] = useState<string>('');
+  const [currentQuestion, setCurrentQuestion] = useState(0);
 
   // Add a helper function to safely get string values
   const getStringValue = (value: any): string => {
@@ -597,6 +605,180 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
     fetchAvatars();
   }, [leaderboard]);
 
+  // Fetch quiz data
+  const fetchQuiz = async () => {
+    const account = localStorage.getItem('account');
+    const apiKey = localStorage.getItem('apiKey');
+    if (!apiKey || !account) {
+      toast.error('API key or account is missing');
+      return;
+    }
+    setIsLoadingQuiz(true);
+    try {
+      const slug = '1-test-quiz';
+      setQuizSlug(slug);
+      const response = await fetch(`https://api.gamelayer.co/api/v0/quizzes/${encodeURIComponent(slug)}?account=${encodeURIComponent(account)}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'api-key': apiKey
+        }
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to fetch quiz: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      setQuiz(data);
+    } catch (error) {
+      console.error('Error fetching quiz:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch quiz');
+    } finally {
+      setIsLoadingQuiz(false);
+    }
+  };
+
+  // Function to start the quiz and get questions
+  const startQuiz = async (quizId: string) => {
+    const account = localStorage.getItem('account');
+    const apiKey = localStorage.getItem('apiKey');
+    const playerId = playerProfile?.player_id || playerProfile?.id;
+    if (!apiKey || !account) {
+      toast.error('API key or account is missing');
+      return;
+    }
+    if (!playerId) {
+      toast.error('Player ID is missing');
+      return;
+    }
+    setIsStartingQuiz(true);
+    setQuizSlug(quizId); // Always set the slug when starting
+    const url = `https://api.gamelayer.co/api/v0/quizzes/${encodeURIComponent(quizId)}/start`;
+    const payload = { account, player: playerId };
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'api-key': apiKey
+    };
+    console.log('[QUIZ DEBUG] Starting quiz:', { quizId, url, payload, headers });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      console.log('[QUIZ DEBUG] Response status:', response.status, response.statusText);
+      if (!response.ok) {
+        let errorData = null;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = await response.text();
+        }
+        console.error('[QUIZ DEBUG] Error response body:', errorData);
+        throw new Error((errorData && errorData.message) || `Failed to start quiz: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log('[QUIZ DEBUG] Quiz start success, data:', data);
+      setActiveQuiz(data);
+      setCurrentQuestion(0);
+      setQuizAnswers({});
+      setQuizModalOpen(true);
+    } catch (error) {
+      console.error('Error starting quiz:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to start quiz');
+    } finally {
+      setIsStartingQuiz(false);
+    }
+  };
+
+  // Add a function to submit quiz answers
+  const submitQuizAnswers = async () => {
+    console.log('[QUIZ SUBMIT] Called submitQuizAnswers');
+    if (!activeQuiz || !activeQuiz.questions) {
+      console.log('[QUIZ SUBMIT] Missing quiz data', { activeQuiz });
+      return;
+    }
+    if (!quizSlug) {
+      toast.error('Quiz slug is missing. Cannot submit quiz.');
+      return;
+    }
+    const account = localStorage.getItem('account');
+    const apiKey = localStorage.getItem('apiKey');
+    const playerId = playerProfile?.player_id || playerProfile?.id;
+    console.log('[QUIZ SUBMIT] account:', account, 'apiKey:', apiKey, 'playerId:', playerId);
+    if (!apiKey || !account) {
+      toast.error('API key or account is missing');
+      return;
+    }
+    if (!playerId) {
+      toast.error('Player ID is missing');
+      return;
+    }
+    // Build answers array
+    const answers = activeQuiz.questions.map((q: any, idx: number) => {
+      const qid = q.id || idx;
+      const answerId = quizAnswers[qid];
+      return {
+        questionId: q.id,
+        answerIds: answerId ? [answerId] : []
+      };
+    });
+    console.log('[QUIZ SUBMIT] answers:', answers);
+    // Validation: require all questions to be answered
+    const allAnswered = answers.every((a: any) => a.answerIds && a.answerIds.length > 0);
+    if (!allAnswered) {
+      toast.error('Please answer all questions before submitting.');
+      return;
+    }
+    const url = `https://api.gamelayer.co/api/v0/quizzes/${encodeURIComponent(quizSlug || 'unknown')}/complete`;
+    const payload = { account, player: playerId, answers };
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'api-key': apiKey
+    };
+    console.log('[QUIZ SUBMIT] POST', url, payload);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      console.log('[QUIZ SUBMIT] Response status:', response.status, response.statusText);
+      if (!response.ok) {
+        let errorData = null;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = await response.text();
+        }
+        console.error('[QUIZ SUBMIT] Error response body:', errorData);
+        throw new Error((errorData && errorData.message) || `Failed to submit quiz: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log('[QUIZ SUBMIT] API response:', data);
+      // Simplified toast logic: failMessage (error) takes precedence, then passMessage (success), then fallback
+      if (data && data.failMessage) {
+        toast.error(data.failMessage);
+      } else if (data && data.passMessage) {
+        toast.success(data.passMessage);
+      } else if (data && data.message) {
+        toast.info(data.message);
+      } else if (data && data.result) {
+        toast.info(data.result);
+      } else {
+        toast.info('Quiz completed.');
+      }
+      await onRefresh();
+      setQuizModalOpen(false);
+      fetchQuiz(); // Refresh quiz data so user can try again
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to submit quiz');
+    }
+  };
+
   React.useEffect(() => {
     if (activeTab === 'awards') {
       fetchAllAchievements();
@@ -606,6 +788,8 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       fetchLeaderboard();
     } else if (activeTab === 'player' && playerProfile?.player_id) {
       fetchPlayerHistory();
+    } else if (activeTab === 'quizzes') {
+      fetchQuiz();
     }
   }, [activeTab, playerProfile?.player_id]);
 
@@ -650,6 +834,27 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
           }}
         >
           Missions
+        </button>
+        <button
+          onClick={() => setActiveTab('quizzes')}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: activeTab === 'quizzes' ? '#646cff' : 'transparent',
+            color: activeTab === 'quizzes' ? 'white' : '#666',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.1em',
+            fontWeight: 'bold',
+            borderRadius: '8px 8px 0 0',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            marginBottom: '-1px',
+            borderBottom: activeTab === 'quizzes' ? '3px solid #646cff' : 'none',
+            boxShadow: activeTab === 'quizzes' ? '0 -2px 4px rgba(0,0,0,0.1)' : 'none',
+            transform: activeTab === 'quizzes' ? 'scale(1.05)' : 'scale(1)'
+          }}
+        >
+          Quizzes
         </button>
         <button
           onClick={() => setActiveTab('prizes')}
@@ -915,7 +1120,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                       {/* Mission Stats */}
                       <div style={{ 
                         display: 'flex', 
-                        gap: '20px',
+                        gap: '12px',
                         marginTop: 'auto',
                         flexWrap: mission.priority === 2 ? 'nowrap' : 'wrap',
                         justifyContent: mission.priority === 2 ? 'flex-start' : 'space-between',
@@ -1041,6 +1246,204 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                 );
               })}
             </div>
+          </div>
+        </div>
+
+        <div style={{
+          width: '100%',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          opacity: activeTab === 'quizzes' ? 1 : 0,
+          transform: activeTab === 'quizzes' ? 'translateX(0)' : 'translateX(20px)',
+          pointerEvents: activeTab === 'quizzes' ? 'auto' : 'none',
+          visibility: activeTab === 'quizzes' ? 'visible' : 'hidden',
+          position: activeTab === 'quizzes' ? 'relative' : 'absolute'
+        }}>
+          <div style={{ 
+            opacity: isLoadingQuiz ? 0.5 : 1,
+            transition: 'all 0.3s ease',
+            transform: isLoadingQuiz ? 'scale(0.98)' : 'scale(1)'
+          }}>
+            {isLoadingQuiz ? (
+              <div style={{ 
+                textAlign: 'center', 
+                color: '#666',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)'
+              }}>
+                Loading quiz...
+              </div>
+            ) : !quiz ? (
+              <div style={{ 
+                textAlign: 'center', 
+                color: '#666',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)'
+              }}>
+                No quiz available
+              </div>
+            ) : (
+              <div style={{
+                padding: '20px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                maxWidth: '800px',
+                margin: '20px auto'
+              }}>
+                <div style={{
+                  padding: '20px',
+                  border: `1px solid ${hoveredCard === 'quiz' ? '#646cff' : '#e0e0e0'}`,
+                  borderRadius: '12px',
+                  backgroundColor: '#f8f8f8',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  width: '100%',
+                  minHeight: '140px',
+                  boxShadow: hoveredCard === 'quiz' ? '0 4px 8px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)'
+                }}
+                onMouseEnter={() => setHoveredCard('quiz')}
+                onMouseLeave={() => setHoveredCard(null)}
+                >
+                  {/* Quiz Image - top, fills width */}
+                  <div style={{
+                    width: '100%',
+                    height: '120px',
+                    borderRadius: '8px 8px 0 0',
+                    overflow: 'hidden',
+                    backgroundColor: '#e0e0e0',
+                    transition: 'all 0.3s ease',
+                    transform: hoveredCard === 'quiz' ? 'scale(1.03)' : 'scale(1)'
+                  }}>
+                    <img
+                      src={quiz.imgUrl || 'https://placehold.co/400x120?text=Quiz'}
+                      alt={quiz.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        transition: 'all 0.3s ease',
+                        transform: hoveredCard === 'quiz' ? 'scale(1.07)' : 'scale(1)'
+                      }}
+                    />
+                  </div>
+                  {/* Quiz Content - below image */}
+                  <div style={{ flex: 1, padding: '16px 8px 0 8px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '10px'
+                    }}>
+                      <h3 style={{
+                        margin: 0,
+                        color: hoveredCard === 'quiz' ? '#646cff' : '#333',
+                        fontSize: '1.2em',
+                        fontWeight: 'bold',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        {quiz.name}
+                      </h3>
+                    </div>
+                    {quiz.description && (
+                      <p style={{
+                        color: hoveredCard === 'quiz' ? '#646cff' : '#666',
+                        marginBottom: '15px',
+                        fontSize: '0.95em',
+                        lineHeight: '1.4',
+                        textAlign: 'left',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        {quiz.description}
+                      </p>
+                    )}
+                    {/* Quiz Stats and Button */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '12px',
+                      marginTop: 'auto',
+                      flexWrap: 'wrap',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      width: '100%'
+                    }}>
+                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {quiz.reward?.points !== undefined && (
+                          <div style={{
+                            backgroundColor: '#646cff',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.9em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.3s ease',
+                            transform: hoveredBadge === 'points-quiz' ? 'scale(1.05)' : 'scale(1)',
+                            boxShadow: hoveredBadge === 'points-quiz' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                          onMouseEnter={() => setHoveredBadge('points-quiz')}
+                          onMouseLeave={() => setHoveredBadge(null)}
+                          >
+                            <span style={{ fontWeight: 'bold' }}>Points:</span>
+                            <span>{quiz.reward.points.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {quiz.reward?.credits !== undefined && (
+                          <div style={{
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.9em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.3s ease',
+                            transform: hoveredBadge === 'credits-quiz' ? 'scale(1.05)' : 'scale(1)',
+                            boxShadow: hoveredBadge === 'credits-quiz' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                          onMouseEnter={() => setHoveredBadge('credits-quiz')}
+                          onMouseLeave={() => setHoveredBadge(null)}
+                          >
+                            <span style={{ fontWeight: 'bold' }}>Credits:</span>
+                            <span>{quiz.reward.credits.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        style={{
+                          backgroundColor: '#646cff',
+                          color: 'white',
+                          padding: '8px 20px',
+                          borderRadius: '6px',
+                          fontWeight: 'bold',
+                          fontSize: '1em',
+                          border: 'none',
+                          cursor: isStartingQuiz ? 'not-allowed' : 'pointer',
+                          boxShadow: hoveredButton === 'go-quiz' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                          transition: 'all 0.3s ease',
+                          transform: hoveredButton === 'go-quiz' ? 'scale(1.05)' : 'scale(1)',
+                          opacity: isStartingQuiz ? 0.6 : 1
+                        }}
+                        onMouseEnter={() => setHoveredButton('go-quiz')}
+                        onMouseLeave={() => setHoveredButton(null)}
+                        onClick={() => quiz?.id && !isStartingQuiz && startQuiz(quiz.id)}
+                        disabled={isStartingQuiz}
+                      >
+                        {isStartingQuiz ? 'Loading...' : 'GO!'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1175,7 +1578,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                           {/* Prize Stats */}
                           <div style={{ 
                             display: 'flex', 
-                            gap: '20px',
+                            gap: '12px',
                             marginTop: 'auto',
                             flexWrap: 'wrap',
                             justifyContent: 'space-between',
@@ -1793,6 +2196,230 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
           </div>
         </div>
       </div>
+      {/* Quiz Modal Popup */}
+      {quizModalOpen && activeQuiz && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.45)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+            padding: '32px 24px',
+            minWidth: 340,
+            maxWidth: 520,
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+          }}>
+            <button
+              onClick={() => setQuizModalOpen(false)}
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                background: 'transparent',
+                border: 'none',
+                fontSize: 22,
+                color: '#888',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+              }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h2 style={{ marginTop: 0, marginBottom: 18, textAlign: 'center' }}>{activeQuiz.name}</h2>
+            {/* Progress Bar */}
+            {activeQuiz.questions && activeQuiz.questions.length > 1 && (
+              <div style={{
+                width: '100%',
+                margin: '0 auto 24px auto',
+                height: 10,
+                background: '#e0e4fa',
+                borderRadius: 6,
+                overflow: 'hidden',
+                boxShadow: '0 1px 4px rgba(100,108,255,0.07)'
+              }}>
+                <div
+                  style={{
+                    width: `${((currentQuestion + 1) / activeQuiz.questions.length) * 100}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #646cff 60%, #aab6ff 100%)',
+                    borderRadius: 6,
+                    transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)'
+                  }}
+                />
+              </div>
+            )}
+            {(!activeQuiz.questions || activeQuiz.questions.length === 0) ? (
+              <div style={{ color: '#c00', fontWeight: 600, textAlign: 'center', margin: '32px 0' }}>
+                Error: Quiz data is incomplete or invalid. Please try again later.
+              </div>
+            ) : (
+              <form onSubmit={e => { e.preventDefault(); submitQuizAnswers(); }}>
+                {/* Show only the current question */}
+                {(() => {
+                  const q = activeQuiz.questions[currentQuestion];
+                  const idx = currentQuestion;
+                  return (
+                    <div key={q.id || idx} style={{
+                      marginBottom: 28,
+                      background: '#f7f8ff',
+                      borderRadius: 12,
+                      boxShadow: '0 1px 4px rgba(100,108,255,0.07)',
+                      padding: 18,
+                      border: '1.5px solid #e0e0e0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'stretch',
+                      gap: 10,
+                    }}>
+                      {/* Question Image */}
+                      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                        <img
+                          src={q.imgUrl || 'https://placehold.co/320x160?text=Question'}
+                          alt="Question"
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: 140,
+                            borderRadius: 8,
+                            objectFit: 'cover',
+                            boxShadow: '0 2px 8px rgba(100,108,255,0.08)',
+                          }}
+                        />
+                      </div>
+                      <div style={{ fontWeight: 600, marginBottom: 6, fontSize: '1.08em', color: '#333', textAlign: 'center' }}>{q.text || q.question || `Question ${idx + 1}`}</div>
+                      {q.choices && Array.isArray(q.choices) ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                          {q.choices.map((choice: any, cidx: number) => (
+                            <label key={choice.id || cidx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 14,
+                              background: '#fff',
+                              borderRadius: 8,
+                              border: quizAnswers[q.id || idx] === (choice.id || choice) ? '2px solid #646cff' : '1.5px solid #e0e0e0',
+                              boxShadow: quizAnswers[q.id || idx] === (choice.id || choice) ? '0 2px 8px rgba(100,108,255,0.10)' : 'none',
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              transition: 'border 0.2s, box-shadow 0.2s',
+                            }}>
+                              {/* Choice Image */}
+                              <img
+                                src={choice.imgUrl || 'https://placehold.co/48x48?text=Option'}
+                                alt="Option"
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 6,
+                                  objectFit: 'cover',
+                                  background: '#e0e0e0',
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <input
+                                type="radio"
+                                name={`quiz-q-${idx}`}
+                                value={choice.id || choice}
+                                checked={quizAnswers[q.id || idx] === (choice.id || choice)}
+                                onChange={() => setQuizAnswers(a => ({ ...a, [q.id || idx]: choice.id || choice }))}
+                                style={{ marginRight: 8 }}
+                              />
+                              <span style={{ fontSize: '1em', color: '#222', fontWeight: 500 }}>{choice.text || choice.label || choice}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={quizAnswers[q.id || idx] || ''}
+                          onChange={e => setQuizAnswers(a => ({ ...a, [q.id || idx]: e.target.value }))}
+                          style={{ width: '100%', padding: 10, borderRadius: 6, border: '1.5px solid #ccc', fontSize: '1em', marginTop: 8 }}
+                          placeholder="Your answer"
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
+                {/* Navigation Buttons */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentQuestion(q => Math.max(0, q - 1))}
+                    disabled={currentQuestion === 0}
+                    style={{
+                      background: '#eee',
+                      color: '#333',
+                      padding: '8px 20px',
+                      borderRadius: 8,
+                      fontWeight: 'bold',
+                      fontSize: '1em',
+                      border: 'none',
+                      cursor: currentQuestion === 0 ? 'not-allowed' : 'pointer',
+                      opacity: currentQuestion === 0 ? 0.6 : 1,
+                      marginRight: 8
+                    }}
+                  >
+                    Previous
+                  </button>
+                  {currentQuestion < activeQuiz.questions.length - 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentQuestion(q => Math.min(activeQuiz.questions.length - 1, q + 1))}
+                      disabled={!quizAnswers[activeQuiz.questions[currentQuestion].id || currentQuestion]}
+                      style={{
+                        background: '#646cff',
+                        color: 'white',
+                        padding: '8px 20px',
+                        borderRadius: 8,
+                        fontWeight: 'bold',
+                        fontSize: '1em',
+                        border: 'none',
+                        cursor: !quizAnswers[activeQuiz.questions[currentQuestion].id || currentQuestion] ? 'not-allowed' : 'pointer',
+                        opacity: !quizAnswers[activeQuiz.questions[currentQuestion].id || currentQuestion] ? 0.6 : 1
+                      }}
+                    >
+                      Next
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!quizAnswers[activeQuiz.questions[currentQuestion].id || currentQuestion]}
+                      style={{
+                        background: '#646cff',
+                        color: 'white',
+                        padding: '8px 32px',
+                        borderRadius: 8,
+                        fontWeight: 'bold',
+                        fontSize: '1.08em',
+                        border: 'none',
+                        cursor: !quizAnswers[activeQuiz.questions[currentQuestion].id || currentQuestion] ? 'not-allowed' : 'pointer',
+                        marginTop: 10,
+                        boxShadow: '0 2px 8px rgba(100,108,255,0.10)',
+                        letterSpacing: 0.5,
+                        opacity: !quizAnswers[activeQuiz.questions[currentQuestion].id || currentQuestion] ? 0.6 : 1
+                      }}
+                    >
+                      Submit
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
