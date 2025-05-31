@@ -151,6 +151,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   const [quizSlug, setQuizSlug] = useState<string>('');
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [completedQuizzes, setCompletedQuizzes] = useState<any[]>([]);
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
 
   // Add a helper function to safely get string values
   const getStringValue = (value: any): string => {
@@ -1840,14 +1841,14 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                 backgroundColor: 'white',
                 borderRadius: '8px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                maxWidth: '800px',
+                maxWidth: '900px',
                 margin: '20px auto'
               }}>
-                <div style={{ 
+                <div style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '20px',
-                  alignItems: 'stretch'
+                  gap: '18px',
+                  width: '100%',
                 }}>
                   {leaderboard.length === 0 ? (
                     <div style={{
@@ -1865,94 +1866,88 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   ) : (
                     leaderboard.map((entry, index) => {
                       const isCurrentPlayer = entry.player_id === playerProfile?.player_id;
+                      let cardBg = isCurrentPlayer ? '#e3e7f7' : '#f7f8fa'; // highlight only current player
+                      let border = selectedCard === entry.player_id ? '2.5px solid #646cff' : '1.5px solid #e0e0e0';
+                      const isHovered = hoveredCard === entry.player_id;
+                      const cardBorder = isHovered ? '2px solid #646cff' : border;
+                      const cardBoxShadow = isHovered
+                        ? '0 6px 18px rgba(100,108,255,0.13), 0 2px 8px rgba(0,0,0,0.10)'
+                        : (isCurrentPlayer
+                          ? '0 4px 16px rgba(100,108,255,0.13), 0 2px 8px rgba(0,0,0,0.10)'
+                          : '0 1px 3px rgba(0,0,0,0.04)');
+                      const cardTransform = isHovered ? 'scale(1.025)' : 'scale(1)';
                       return (
                         <div
                           key={entry.player_id}
                           style={{
-                            padding: '12px 18px',
-                            border: isCurrentPlayer
-                              ? '2.5px solid #646cff'
-                              : (hoveredCard === entry.player_id ? '2px solid #aab6ff' : '1.5px solid #e0e0e0'),
-                            borderRadius: '16px',
-                            background: isCurrentPlayer
-                              ? 'linear-gradient(90deg, #e6eaff 0%, #f0f0ff 100%)'
-                              : '#fff',
+                            width: '100%',
+                            minHeight: 40,
+                            padding: '6px 12px',
+                            border: cardBorder,
+                            borderRadius: '14px',
+                            background: cardBg,
                             display: 'flex',
+                            flexDirection: 'row',
                             alignItems: 'center',
-                            gap: '14px',
-                            transition: 'box-shadow 0.25s cubic-bezier(0.4,0,0.2,1), border 0.25s cubic-bezier(0.4,0,0.2,1), transform 0.25s cubic-bezier(0.4,0,0.2,1)',
-                            transform: !isCurrentPlayer && hoveredCard === entry.player_id ? 'translateY(-3px) scale(1.025)' : 'translateY(0) scale(1)',
-                            boxShadow: isCurrentPlayer
-                              ? '0 2px 8px rgba(100,108,255,0.10), 0 1px 4px rgba(100,108,255,0.08)'
-                              : hoveredCard === entry.player_id
-                                ? '0 6px 18px rgba(100,108,255,0.13), 0 2px 8px rgba(0,0,0,0.10)'
-                                : '0 1px 3px rgba(0,0,0,0.04)',
-                            cursor: isCurrentPlayer ? 'default' : 'pointer',
+                            gap: '12px',
+                            boxShadow: cardBoxShadow,
+                            transform: cardTransform,
+                            transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
                             outline: isCurrentPlayer ? '2px solid #646cff33' : 'none',
-                            minHeight: '48px',
                             position: 'relative',
+                            marginTop: 0,
+                            cursor: 'pointer',
                           }}
-                          onMouseEnter={() => {
-                            if (!isCurrentPlayer) {
-                              setHoveredCard(entry.player_id);
-                              console.log('Hovered leaderboard card:', entry.player_id);
-                            }
-                          }}
-                          onMouseLeave={() => {
-                            setHoveredCard(null);
-                            console.log('Unhovered leaderboard card:', entry.player_id);
-                          }}
+                          onMouseEnter={() => setHoveredCard(entry.player_id)}
+                          onMouseLeave={() => setHoveredCard(null)}
+                          onClick={() => setSelectedCard(selectedCard === entry.player_id ? null : entry.player_id)}
                         >
-                          {/* Rank */}
+                          {/* Rank Number */}
                           <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            backgroundColor: index < 3 ? ['#FFD700', '#C0C0C0', '#CD7F32'][index] : '#e0e0e0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: index < 3 ? 'white' : '#666',
+                            fontSize: '1.5em', // reduced font size
                             fontWeight: 'bold',
-                            fontSize: '1.2em'
+                            color: '#646cff',
+                            marginRight: 10,
+                            minWidth: 28,
+                            textAlign: 'center',
                           }}>
                             {index + 1}
                           </div>
-
-                          {/* Player Avatar and Name */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                            <div style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              overflow: 'hidden',
-                              border: '2px solid #646cff',
-                              flexShrink: 0
-                            }}>
-                              <img 
-                                src={playerAvatars[entry.player] || 'https://placehold.co/40x40?text=Player'} 
-                                alt={`${entry.name}'s avatar`}
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover'
-                                }}
-                              />
-                            </div>
-                            <h3 style={{ 
-                              margin: 0,
-                              color: isCurrentPlayer ? '#646cff' : '#333',
-                              fontSize: '1.1em',
-                              fontWeight: 'bold',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              maxWidth: 160
-                            }}>
-                              {entry.name}
-                            </h3>
+                          {/* Player Avatar */}
+                          <div style={{
+                            width: '36px', // reduced avatar size
+                            height: '36px',
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            border: '2px solid #646cff',
+                            marginRight: 10,
+                          }}>
+                            <img 
+                              src={playerAvatars[entry.player] || 'https://placehold.co/60x60?text=Player'} 
+                              alt={`${entry.name}'s avatar`}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                            />
                           </div>
-
+                          {/* Player Name */}
+                          <h3 style={{ 
+                            margin: 0,
+                            color: isCurrentPlayer ? '#646cff' : '#333',
+                            fontSize: '1.1em',
+                            fontWeight: 'bold',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: 160,
+                            textAlign: 'left',
+                          }}>
+                            {entry.name}
+                          </h3>
+                          {/* Spacer to push points to the right */}
+                          <div style={{ flex: 1 }} />
                           {/* Points */}
                           <div style={{
                             backgroundColor: '#646cff',
@@ -1964,7 +1959,6 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            marginLeft: 'auto',
                             minWidth: '72px',
                             maxWidth: '72px',
                             justifyContent: 'center',
