@@ -70,6 +70,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [playerId, setPlayerId] = useState('');
   const [showAvatarGrid, setShowAvatarGrid] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +118,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           <label htmlFor="apiKey" style={{ fontSize: '0.9em', whiteSpace: 'nowrap' }}>API Key:</label>
           <div style={{ flex: 1, display: 'flex', gap: '10px' }}>
             <input
-              type={isStored ? "text" : "password"}
+              type={isStored ? 'password' : 'text'}
               id="apiKey"
               value={apiKey}
               onChange={(e) => onInputChange('apiKey', e.target.value)}
