@@ -1483,10 +1483,10 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                         style={{
                           backgroundColor: '#646cff',
                           color: 'white',
-                          padding: '6px 14px', // reduced padding
-                          borderRadius: '5px', // reduced border radius
+                          padding: '10px 24px', // increased padding
+                          borderRadius: '8px', // increased border radius
                           fontWeight: 'bold',
-                          fontSize: '0.95em', // reduced font size
+                          fontSize: '1.08em', // increased font size
                           border: 'none',
                           cursor: isStartingQuiz ? 'not-allowed' : 'pointer',
                           boxShadow: hoveredButton === 'go-quiz' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
@@ -1743,57 +1743,59 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                               )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center' }}>
-                              <div style={{
-                                backgroundColor: '#646cff',
-                                color: 'white',
-                                padding: '6px 14px', // reduced padding
-                                borderRadius: '5px', // reduced border radius
-                                fontWeight: 'bold',
-                                fontSize: '0.95em', // reduced font size
-                                border: 'none',
-                                cursor: 'pointer',
-                                boxShadow: hoveredButton === `claim-${prize.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-                                transition: 'all 0.3s ease',
-                                transform: hoveredButton === `claim-${prize.id}` ? 'scale(1.05)' : 'scale(1)'
-                              }}
-                              onMouseEnter={() => setHoveredButton(`claim-${prize.id}`)}
-                              onMouseLeave={() => setHoveredButton(null)}
-                              onClick={async () => {
-                                try {
-                                  const account = localStorage.getItem('account');
-                                  const apiKey = localStorage.getItem('apiKey');
-                                  if (!account || !apiKey) {
-                                    toast.error('Missing account or API key');
-                                    return;
+                              <button
+                                style={{
+                                  backgroundColor: '#646cff',
+                                  color: 'white',
+                                  padding: '10px 24px', // increased padding
+                                  borderRadius: '8px', // increased border radius
+                                  fontWeight: 'bold',
+                                  fontSize: '1.08em', // increased font size
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  boxShadow: hoveredButton === `claim-${prize.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                                  transition: 'all 0.3s ease',
+                                  transform: hoveredButton === `claim-${prize.id}` ? 'scale(1.05)' : 'scale(1)'
+                                }}
+                                onMouseEnter={() => setHoveredButton(`claim-${prize.id}`)}
+                                onMouseLeave={() => setHoveredButton(null)}
+                                onClick={async () => {
+                                  try {
+                                    const account = localStorage.getItem('account');
+                                    const apiKey = localStorage.getItem('apiKey');
+                                    if (!account || !apiKey) {
+                                      toast.error('Missing account or API key');
+                                      return;
+                                    }
+                                    const response = await fetch(`https://api.gamelayer.co/api/v0/prizes/${prize.id}/claim`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'api-key': apiKey
+                                      },
+                                      body: JSON.stringify({
+                                        player: playerProfile.player_id,
+                                        account: account
+                                      })
+                                    });
+                                    if (!response.ok) {
+                                      const errorData = await response.json();
+                                      throw new Error(errorData?.message || `Failed to claim prize: ${response.status} ${response.statusText}`);
+                                    }
+                                    toast.success('Prize claimed successfully!');
+                                    await Promise.all([
+                                      fetchPrizes(),
+                                      onRefresh()
+                                    ]);
+                                  } catch (error) {
+                                    console.error('Error claiming prize:', error);
+                                    toast.error(error instanceof Error ? error.message : 'Failed to claim prize');
                                   }
-                                  const response = await fetch(`https://api.gamelayer.co/api/v0/prizes/${prize.id}/claim`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'Accept': 'application/json',
-                                      'api-key': apiKey
-                                    },
-                                    body: JSON.stringify({
-                                      player: playerProfile.player_id,
-                                      account: account
-                                    })
-                                  });
-                                  if (!response.ok) {
-                                    const errorData = await response.json();
-                                    throw new Error(errorData?.message || `Failed to claim prize: ${response.status} ${response.statusText}`);
-                                  }
-                                  toast.success('Prize claimed successfully!');
-                                  await Promise.all([
-                                    fetchPrizes(),
-                                    onRefresh()
-                                  ]);
-                                } catch (error) {
-                                  console.error('Error claiming prize:', error);
-                                  toast.error(error instanceof Error ? error.message : 'Failed to claim prize');
-                                }
-                              }}>
+                                }}
+                              >
                                 GET!
-                              </div>
+                              </button>
                             </div>
                           </div>
                         </div>
