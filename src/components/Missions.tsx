@@ -150,6 +150,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   const [isStartingQuiz, setIsStartingQuiz] = useState(false);
   const [quizSlug, setQuizSlug] = useState<string>('');
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [completedQuizzes, setCompletedQuizzes] = useState<any[]>([]);
 
   // Add a helper function to safely get string values
   const getStringValue = (value: any): string => {
@@ -557,6 +558,66 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       const data = await prizesResponse.json();
       console.log('[DEBUG] Redeemed prizes API response:', data);
       setRedeemedPrizes(Array.isArray(data.prizes) ? data.prizes : []);
+
+      // Fetch player completed quizzes using /quizzes/{id}/result
+      try {
+        const quizzesListUrl = `https://api.gamelayer.co/api/v0/quizzes?account=${encodeURIComponent(account)}`;
+        const quizzesListResponse = await fetch(quizzesListUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "api-key": apiKey
+          }
+        });
+        if (!quizzesListResponse.ok) {
+          const errorText = await quizzesListResponse.text();
+          console.error('Quizzes list error response:', errorText);
+          throw new Error(`Failed to fetch quizzes list: ${quizzesListResponse.status} ${quizzesListResponse.statusText}`);
+        }
+        const quizzesListData = await quizzesListResponse.json();
+        let allQuizzes = [];
+        if (Array.isArray(quizzesListData)) {
+          allQuizzes = quizzesListData;
+        } else if (quizzesListData && Array.isArray(quizzesListData.data)) {
+          allQuizzes = quizzesListData.data;
+        } else if (quizzesListData && quizzesListData.quizzes && Array.isArray(quizzesListData.quizzes)) {
+          allQuizzes = quizzesListData.quizzes;
+        }
+        // For each quiz, fetch the player's result
+        const quizResults = await Promise.all(
+          allQuizzes.map(async (quiz: any) => {
+            try {
+              const resultUrl = `https://api.gamelayer.co/api/v0/quizzes/${quiz.id}/result?account=${encodeURIComponent(account)}&player=${encodeURIComponent(playerId)}`;
+              const resultResponse = await fetch(resultUrl, {
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  "api-key": apiKey
+                }
+              });
+              if (!resultResponse.ok) return null;
+              const resultData = await resultResponse.json();
+              // Only show if actions.count > 0
+              if (resultData.actions && resultData.actions.count > 0) {
+                return {
+                  name: resultData.quiz?.name || quiz.name,
+                  status: resultData.actions.passed ? 'Passed' : 'Failed',
+                  first: resultData.actions.startedOn,
+                  last: resultData.actions.completedOn
+                };
+              }
+              return null;
+            } catch (e) {
+              return null;
+            }
+          })
+        );
+        // Filter out nulls
+        setCompletedQuizzes(quizResults.filter(Boolean));
+      } catch (error) {
+        console.error('Error fetching completed quizzes:', error);
+        setCompletedQuizzes([]);
+      }
 
       // Log final state
       console.log('Final state after fetching:', {
@@ -2078,9 +2139,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                 maxWidth: '800px',
                 margin: '20px auto'
               }}>
-                {/* Completed Missions Section */}
+                {/* Missions Completed Section */}
                 <div style={{ marginBottom: '30px' }}>
-                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Completed Missions</h2>
+                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Missions Completed</h2>
                   <table style={{ 
                     width: '100%',
                     borderCollapse: 'collapse',
@@ -2114,9 +2175,47 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   </table>
                 </div>
 
-                {/* Granted Achievements Section */}
+                {/* Quizzes Completed Section - always show, even if empty */}
                 <div style={{ marginBottom: '30px' }}>
-                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Awards Unlocked</h2>
+                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Quizzes Completed</h2>
+                  {completedQuizzes && completedQuizzes.length > 0 ? (
+                    <table style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0' }}>Name</th>
+                          <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Status</th>
+                          <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>First</th>
+                          <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Last</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {completedQuizzes.map((row: any, idx: number) => (
+                          <tr key={row.name + '-' + idx} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                            <td style={{ padding: '12px', textAlign: 'left' }}>{row.name}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{row.status}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{row.first ? new Date(row.first).toLocaleDateString() : '-'}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{row.last ? new Date(row.last).toLocaleDateString() : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div style={{ color: '#888', textAlign: 'center', padding: '18px 0' }}>
+                      No quizzes attempted yet.
+                    </div>
+                  )}
+                </div>
+
+                {/* Awards Completed Section */}
+                <div style={{ marginBottom: '30px' }}>
+                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Awards Completed</h2>
                   <div style={{ 
                     display: 'flex',
                     flexDirection: 'column',
@@ -2140,10 +2239,14 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                       <tbody>
                         {grantedAchievements.map((achievement: any) => {
                           const date = achievement.granted_at || achievement.actions?.completedOn;
+                          let status = 'Granted';
+                          if (achievement.status && achievement.status.toLowerCase() === 'unlocked') {
+                            status = 'Unlocked';
+                          }
                           return (
                             <tr key={achievement.id} style={{ borderBottom: '1px solid #e0e0e0' }}>
                               <td style={{ padding: '12px', textAlign: 'left' }}>{achievement.name}</td>
-                              <td style={{ color: '#666', padding: '12px', textAlign: 'center' }}>{achievement.status ?? 'granted'}</td>
+                              <td style={{ color: '#666', padding: '12px', textAlign: 'center' }}>{status}</td>
                               <td style={{ color: '#666', padding: '12px', textAlign: 'center' }}>{date ? new Date(date).toLocaleDateString() : '-'}</td>
                             </tr>
                           );
@@ -2153,9 +2256,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   </div>
                 </div>
 
-                {/* Redeemed Prizes Section */}
+                {/* Prizes Redeemed Section */}
                 <div>
-                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Redeemed Prizes</h2>
+                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Prizes Redeemed</h2>
                   <table style={{ 
                     width: '100%',
                     borderCollapse: 'collapse',
@@ -2167,21 +2270,17 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     <thead>
                       <tr>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0' }}>Name</th>
-                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Credits Used</th>
                         <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Redemptions</th>
-                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>First Redeemed</th>
-                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Last Redeemed</th>
+                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>First</th>
+                        <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0' }}>Last</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(redeemedPrizes || []).map((prize) => {
                         const count = prize.actions?.count ?? 1;
-                        const creditsPerRedemption = prize.credits_spent ?? prize.credits ?? 0;
-                        const totalCreditsUsed = creditsPerRedemption * count;
                         return (
                           <tr key={prize.id} style={{ borderBottom: '1px solid #e0e0e0' }}>
                             <td style={{ padding: '12px', textAlign: 'left' }}>{prize.name}</td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>{totalCreditsUsed || '-'}</td>
                             <td style={{ padding: '12px', textAlign: 'center' }}>{count}</td>
                             <td style={{ padding: '12px', textAlign: 'center' }}>{prize.actions?.firstCompletedOn ? new Date(prize.actions.firstCompletedOn).toLocaleDateString() : '-'}</td>
                             <td style={{ padding: '12px', textAlign: 'center' }}>{prize.actions?.completedOn ? new Date(prize.actions.completedOn).toLocaleDateString() : '-'}</td>
