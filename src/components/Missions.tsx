@@ -1867,14 +1867,12 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     leaderboard.map((entry, index) => {
                       const isCurrentPlayer = entry.player_id === playerProfile?.player_id;
                       let cardBg = isCurrentPlayer ? '#e3e7f7' : '#f7f8fa'; // highlight only current player
-                      let border = selectedCard === entry.player_id ? '2.5px solid #646cff' : '1.5px solid #e0e0e0';
+                      let border = '1.5px solid #e0e0e0';
                       const isHovered = hoveredCard === entry.player_id;
-                      const cardBorder = isHovered ? '2px solid #646cff' : border;
+                      const cardBorder = isHovered ? '1px solid #646cff' : border;
                       const cardBoxShadow = isHovered
-                        ? '0 6px 18px rgba(100,108,255,0.13), 0 2px 8px rgba(0,0,0,0.10)'
-                        : (isCurrentPlayer
-                          ? '0 4px 16px rgba(100,108,255,0.13), 0 2px 8px rgba(0,0,0,0.10)'
-                          : '0 1px 3px rgba(0,0,0,0.04)');
+                        ? '0 4px 8px rgba(0,0,0,0.1)'
+                        : '0 2px 4px rgba(0,0,0,0.05)';
                       const cardTransform = isHovered ? 'scale(1.025)' : 'scale(1)';
                       return (
                         <div
