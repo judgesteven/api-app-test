@@ -1483,10 +1483,10 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                         style={{
                           backgroundColor: '#646cff',
                           color: 'white',
-                          padding: '8px 20px',
-                          borderRadius: '6px',
+                          padding: '6px 14px', // reduced padding
+                          borderRadius: '5px', // reduced border radius
                           fontWeight: 'bold',
-                          fontSize: '1em',
+                          fontSize: '0.95em', // reduced font size
                           border: 'none',
                           cursor: isStartingQuiz ? 'not-allowed' : 'pointer',
                           boxShadow: hoveredButton === 'go-quiz' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
@@ -1709,19 +1709,52 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                                 <span style={{ fontWeight: 'bold' }}>Available:</span>
                                 <span>{prize.stock?.available?.toLocaleString() || '0'}</span>
                               </div>
+                              {(prize.expires_at || prize.active?.to || prize.end_date) && (
+                                <div style={{
+                                  color: '#666',
+                                  fontSize: '0.9em',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  position: 'relative',
+                                  cursor: 'help',
+                                  padding: '6px',
+                                  backgroundColor: isHovered ? '#e0e0e0' : '#f0f0f0',
+                                  borderRadius: '6px',
+                                  marginLeft: 'auto',
+                                  transition: 'all 0.3s ease',
+                                  transform: isHovered ? 'scale(1.05)' : 'scale(1)'
+                                }}
+                                title={`Expires in: ${getTimeRemaining(prize.expires_at || prize.active?.to || prize.end_date || '')}`}
+                                >
+                                  <svg 
+                                    width="20" 
+                                    height="20" 
+                                    viewBox="0 0 24 24" 
+                                    fill="none" 
+                                    stroke={isHovered ? '#646cff' : '#666'} 
+                                    strokeWidth="2" 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round"
+                                  >
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
                               <div style={{
                                 backgroundColor: '#646cff',
                                 color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '0.9em',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
+                                padding: '6px 14px', // reduced padding
+                                borderRadius: '5px', // reduced border radius
+                                fontWeight: 'bold',
+                                fontSize: '0.95em', // reduced font size
+                                border: 'none',
                                 cursor: 'pointer',
+                                boxShadow: hoveredButton === `claim-${prize.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
                                 transition: 'all 0.3s ease',
-                                transform: hoveredButton === `claim-${prize.id}` ? 'scale(1.05)' : 'scale(1)',
-                                boxShadow: hoveredButton === `claim-${prize.id}` ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                                transform: hoveredButton === `claim-${prize.id}` ? 'scale(1.05)' : 'scale(1)'
                               }}
                               onMouseEnter={() => setHoveredButton(`claim-${prize.id}`)}
                               onMouseLeave={() => setHoveredButton(null)}
@@ -1729,12 +1762,10 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                                 try {
                                   const account = localStorage.getItem('account');
                                   const apiKey = localStorage.getItem('apiKey');
-                                  
                                   if (!account || !apiKey) {
                                     toast.error('Missing account or API key');
                                     return;
                                   }
-
                                   const response = await fetch(`https://api.gamelayer.co/api/v0/prizes/${prize.id}/claim`, {
                                     method: 'POST',
                                     headers: {
@@ -1747,14 +1778,11 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                                       account: account
                                     })
                                   });
-
                                   if (!response.ok) {
                                     const errorData = await response.json();
                                     throw new Error(errorData?.message || `Failed to claim prize: ${response.status} ${response.statusText}`);
                                   }
-
                                   toast.success('Prize claimed successfully!');
-                                  // Refresh both the prizes list and player profile
                                   await Promise.all([
                                     fetchPrizes(),
                                     onRefresh()
@@ -1764,41 +1792,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                                   toast.error(error instanceof Error ? error.message : 'Failed to claim prize');
                                 }
                               }}>
-                                <span style={{ fontWeight: 'bold' }}>Claim</span>
+                                GET!
                               </div>
                             </div>
-                            {(prize.expires_at || prize.active?.to || prize.end_date) && (
-                              <div style={{
-                                color: '#666',
-                                fontSize: '0.9em',
-                                display: 'flex',
-                                alignItems: 'center',
-                                position: 'relative',
-                                cursor: 'help',
-                                padding: '6px',
-                                backgroundColor: isHovered ? '#e0e0e0' : '#f0f0f0',
-                                borderRadius: '6px',
-                                marginLeft: 'auto',
-                                transition: 'all 0.3s ease',
-                                transform: isHovered ? 'scale(1.05)' : 'scale(1)'
-                              }}
-                              title={`Expires in: ${getTimeRemaining(prize.expires_at || prize.active?.to || prize.end_date || '')}`}
-                              >
-                                <svg 
-                                  width="20" 
-                                  height="20" 
-                                  viewBox="0 0 24 24" 
-                                  fill="none" 
-                                  stroke={isHovered ? '#646cff' : '#666'} 
-                                  strokeWidth="2" 
-                                  strokeLinecap="round" 
-                                  strokeLinejoin="round"
-                                >
-                                  <circle cx="12" cy="12" r="10"/>
-                                  <polyline points="12 6 12 12 16 14"/>
-                                </svg>
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1950,15 +1946,15 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                           <div style={{
                             backgroundColor: '#646cff',
                             color: 'white',
-                            padding: '8px 16px',
+                            padding: '5px 10px', // reduced padding
                             borderRadius: '6px',
-                            fontSize: '1.1em',
+                            fontSize: '0.98em', // reduced font size
                             fontWeight: 'bold',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            minWidth: '72px',
-                            maxWidth: '72px',
+                            minWidth: '56px', // reduced min width
+                            maxWidth: '56px', // reduced max width
                             justifyContent: 'center',
                           }}>
                             <span>{entry.scores?.toLocaleString() ?? 0}</span>
