@@ -36,11 +36,12 @@ function App() {
   // Initialize form data from localStorage
   const savedAccount = localStorage.getItem('account') || '';
   const savedApiKey = localStorage.getItem('apiKey') || '';
+  const savedPlayer = localStorage.getItem('selectedPlayer') || '';
 
   const [formData, setFormData] = useState({
     account: savedAccount,
     apiKey: savedApiKey,
-    player: '',
+    player: savedPlayer,
     event: ''
   });
 
@@ -280,17 +281,26 @@ function App() {
     }
   }, [formData.account, formData.apiKey]);
 
+  // Persist selected player to localStorage whenever it changes
+  useEffect(() => {
+    if (formData.player) {
+      localStorage.setItem('selectedPlayer', formData.player);
+    }
+  }, [formData.player]);
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => {
       const newData = {
         ...prev,
         [field]: value
       };
-      
       if (field === 'account' || field === 'apiKey') {
         setIsStored(false);
       }
-      
+      // Persist selected player immediately
+      if (field === 'player') {
+        localStorage.setItem('selectedPlayer', value);
+      }
       return newData;
     });
   };
