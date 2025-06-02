@@ -105,7 +105,7 @@ interface RedeemedPrize {
 }
 
 const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, playerProfile, onRefresh, apiKey }) => {
-  const [activeTab, setActiveTab] = useState<'missions' | 'quizzes' | 'prizes' | 'leaderboard' | 'player' | 'awards'>('missions');
+  const [activeTab, setActiveTab] = useState<'missions' | 'quizzes' | 'prizes' | 'leaderboard' | 'player' | 'badges'>('missions');
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -842,7 +842,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   };
 
   React.useEffect(() => {
-    if (activeTab === 'awards') {
+    if (activeTab === 'badges') {
       fetchAllAchievements();
     } else if (activeTab === 'prizes' && playerProfile?.player_id) {
       fetchPrizes();
@@ -961,11 +961,11 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
           Leaderboard
         </button>
         <button
-          onClick={() => setActiveTab('awards')}
+          onClick={() => setActiveTab('badges')}
           style={{
             padding: '12px 24px',
-            backgroundColor: activeTab === 'awards' ? '#646cff' : 'transparent',
-            color: activeTab === 'awards' ? 'white' : '#666',
+            backgroundColor: activeTab === 'badges' ? '#646cff' : 'transparent',
+            color: activeTab === 'badges' ? 'white' : '#666',
             border: 'none',
             cursor: 'pointer',
             fontSize: '1.1em',
@@ -974,12 +974,12 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             position: 'relative',
             marginBottom: '-1px',
-            borderBottom: activeTab === 'awards' ? '3px solid #646cff' : 'none',
-            boxShadow: activeTab === 'awards' ? '0 -2px 4px rgba(0,0,0,0.1)' : 'none',
-            transform: activeTab === 'awards' ? 'scale(1.05)' : 'scale(1)'
+            borderBottom: activeTab === 'badges' ? '3px solid #646cff' : 'none',
+            boxShadow: activeTab === 'badges' ? '0 -2px 4px rgba(0,0,0,0.1)' : 'none',
+            transform: activeTab === 'badges' ? 'scale(1.05)' : 'scale(1)'
           }}
         >
-          Awards
+          Badges
         </button>
         <button
           onClick={() => setActiveTab('player')}
@@ -1974,11 +1974,11 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
         <div style={{
           width: '100%',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          opacity: activeTab === 'awards' ? 1 : 0,
-          transform: activeTab === 'awards' ? 'translateX(0)' : 'translateX(20px)',
-          pointerEvents: activeTab === 'awards' ? 'auto' : 'none',
-          visibility: activeTab === 'awards' ? 'visible' : 'hidden',
-          position: activeTab === 'awards' ? 'relative' : 'absolute'
+          opacity: activeTab === 'badges' ? 1 : 0,
+          transform: activeTab === 'badges' ? 'translateX(0)' : 'translateX(20px)',
+          pointerEvents: activeTab === 'badges' ? 'auto' : 'none',
+          visibility: activeTab === 'badges' ? 'visible' : 'hidden',
+          position: activeTab === 'badges' ? 'relative' : 'absolute'
         }}>
           <div style={{ 
             opacity: isLoadingAchievements ? 0.5 : 1,
@@ -1994,7 +1994,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                 left: '50%',
                 transform: 'translate(-50%, -50%)'
               }}>
-                Loading awards...
+                Loading badges...
               </div>
             ) : (
               <div style={{
@@ -2203,9 +2203,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   )}
                 </div>
 
-                {/* Awards Completed Section */}
+                {/* Badges Completed Section */}
                 <div style={{ marginBottom: '30px' }}>
-                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Awards Completed</h2>
+                  <h2 style={{ color: '#333', marginBottom: '15px' }}>Badges Earned</h2>
                   <div style={{ 
                     display: 'flex',
                     flexDirection: 'column',
