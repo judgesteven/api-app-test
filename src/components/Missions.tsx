@@ -10,6 +10,7 @@ interface Mission {
   status?: string;
   imgUrl?: string;
   priority?: number;
+  category?: string;  // Added category field
   reward?: {
     points?: number;
     credits?: number;
@@ -1081,7 +1082,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
               gap: '20px',
               gridTemplateColumns: 'repeat(auto-fit, minmax(45%, 1fr))'
             }}>
-              {missions.map((mission) => {
+              {missions
+                .filter(mission => mission.category !== 'Hidden')  // Filter out hidden missions
+                .map((mission) => {
                 const isHovered = hoveredCard === mission.id;
                 const points = mission.points || mission.reward?.points;
                 const credits = mission.credits || mission.reward?.credits;
@@ -1092,7 +1095,8 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   credits,
                   reward: mission.reward,
                   active: mission.active,
-                  priority: mission.priority
+                  priority: mission.priority,
+                  category: mission.category  // Added category to logging
                 });
 
                 return (

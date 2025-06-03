@@ -12,6 +12,29 @@ interface Achievement {
   status?: string;
 }
 
+interface StreakData {
+  id: string;
+  name: string;
+  countLimit: number;
+  count?: number;  // Add count for active streak
+}
+
+interface StreakResponse {
+  completed: PlayerStreak[];
+  started: PlayerStreak[];
+}
+
+interface PlayerStreak {
+  id: string;
+  name: string;
+  count: number;
+  status: string;
+  countLimit: number;
+  limitCount: boolean;
+  objectives: any[];
+  account: string;
+}
+
 interface PlayerProfileProps {
   player: {
     id: string;
@@ -39,6 +62,9 @@ interface PlayerProfileProps {
 const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams }) => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [isLoadingAchievements, setIsLoadingAchievements] = useState(false);
+  const [streakData, setStreakData] = useState<StreakData | null>(null);
+  const [playerStreak, setPlayerStreak] = useState<PlayerStreak | null>(null);
+  const [isLoadingStreak, setIsLoadingStreak] = useState(false);
 
   useEffect(() => {
     const fetchAchievements = async () => {
@@ -97,6 +123,113 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
     console.log('Current achievements state:', achievements);
   }, [achievements]);
 
+  const fetchStreak = async () => {
+    const apiKey = localStorage.getItem('apiKey');
+    const account = localStorage.getItem('account');
+    const playerId = player?.player_id || player?.id;
+    
+    if (!apiKey || !account || !playerId) {
+      console.error('Missing required data:', { hasApiKey: !!apiKey, hasAccount: !!account, playerId });
+      return;
+    }
+
+    console.log('Fetching streak data with:', { playerId, account });
+    setIsLoadingStreak(true);
+    try {
+      // First fetch the streak definition
+      const streakResponse = await fetch(`https://api.gamelayer.co/api/v0/streaks/1-test-streak?account=${encodeURIComponent(account)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": apiKey
+        }
+      });
+
+      if (!streakResponse.ok) {
+        const errorText = await streakResponse.text();
+        console.error('Streak definition fetch failed:', {
+          status: streakResponse.status,
+          statusText: streakResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to fetch streak definition: ${streakResponse.status} ${streakResponse.statusText}`);
+      }
+
+      const streakData = await streakResponse.json();
+      console.log('Streak definition data:', streakData);
+      setStreakData(streakData);
+
+      // Then fetch the player's streak status
+      console.log('Fetching player streak status for:', playerId);
+      const playerStreakResponse = await fetch(`https://api.gamelayer.co/api/v0/players/${playerId}/streaks?account=${encodeURIComponent(account)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": apiKey
+        }
+      });
+
+      if (!playerStreakResponse.ok) {
+        const errorText = await playerStreakResponse.text();
+        console.error('Player streak fetch failed:', {
+          status: playerStreakResponse.status,
+          statusText: playerStreakResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to fetch player streak: ${playerStreakResponse.status} ${playerStreakResponse.statusText}`);
+      }
+
+      const playerStreaks = await playerStreakResponse.json();
+      console.log('Raw player streaks response:', playerStreaks);
+
+      // Initialize with a default streak object if none exists
+      let activeStreak = playerStreaks.started?.find((streak: PlayerStreak) => 
+        streak.id === '1-test-streak'
+      ) || playerStreaks.completed?.find((streak: PlayerStreak) => 
+        streak.id === '1-test-streak'
+      );
+
+      if (!activeStreak) {
+        console.log('No active streak found, initializing with default values');
+        // Create a default streak object with count 0
+        activeStreak = {
+          id: '1-test-streak',
+          name: streakData.name,
+          count: 0,
+          status: 'started',
+          countLimit: streakData.countLimit,
+          limitCount: streakData.limitCount,
+          objectives: streakData.objectives,
+          account: account
+        };
+      }
+
+      console.log('Final streak data to be used:', activeStreak);
+      setPlayerStreak(activeStreak);
+    } catch (error) {
+      console.error('Error fetching streak data:', error);
+      setStreakData(null);
+      setPlayerStreak(null);
+    } finally {
+      setIsLoadingStreak(false);
+    }
+  };
+
+  // Add effect to log state changes
+  useEffect(() => {
+    console.log('Streak state updated:', {
+      streakData,
+      playerStreak,
+      isLoadingStreak
+    });
+  }, [streakData, playerStreak, isLoadingStreak]);
+
+  useEffect(() => {
+    if (player) {
+      fetchStreak();
+    }
+  }, [player]);
+
   console.log('PlayerProfile received props:', { player, isLoading, teams });
 
   if (isLoading) {
@@ -150,119 +283,131 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
       <div style={{
         display: 'flex',
         gap: '16px',
-        alignItems: 'flex-start'
+        alignItems: 'stretch'
       }}>
         {/* Left Column: Avatar + Name + Stats */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
-          flex: '1'
+          flex: '1',
+          height: '100%'
         }}>
-          {/* Avatar + Name */}
+          {/* Avatar + Name + Stats Card */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px',
+            gap: '16px',
             background: 'rgba(255, 255, 255, 0.1)',
-            padding: '16px',
+            padding: '20px',
             borderRadius: '8px',
             backdropFilter: 'blur(4px)',
-            width: '100%'
+            width: '100%',
+            height: '100%',
+            boxSizing: 'border-box'
           }}>
+            {/* Avatar + Name */}
             <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              overflow: 'hidden',
-              border: '3px solid rgba(255, 255, 255, 0.8)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-              flexShrink: 0
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px',
+              flex: '1'
             }}>
-              <img 
-                src={safePlayer.avatar} 
-                alt={`${safePlayer.name}'s avatar`}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover'
-                }}
-              />
-            </div>
-            <h2 style={{ 
-              margin: 0, 
-              color: 'white', 
-              fontSize: '1.1em', 
-              textAlign: 'center',
-              textShadow: '0 1px 2px rgba(0,0,0,0.2)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              fontWeight: '600',
-              width: '100%'
-            }}>{safePlayer.name}</h2>
-          </div>
-
-          {/* Stats Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '8px'
-          }}>
-            {/* Points */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              padding: '6px 10px', 
-              borderRadius: '6px',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Points</span>
-              <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.points.toLocaleString()}</span>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '3px solid rgba(255, 255, 255, 0.8)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                flexShrink: 0
+              }}>
+                <img 
+                  src={safePlayer.avatar} 
+                  alt={`${safePlayer.name}'s avatar`}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                />
+              </div>
+              <h2 style={{ 
+                margin: 0, 
+                color: 'white', 
+                fontSize: '1.1em', 
+                textAlign: 'center',
+                textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontWeight: '600',
+                width: '100%'
+              }}>{safePlayer.name}</h2>
             </div>
 
-            {/* Credits */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              padding: '6px 10px', 
-              borderRadius: '6px',
-              backdropFilter: 'blur(4px)'
+            {/* Stats Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '8px',
+              width: '100%',
+              marginTop: 'auto'
             }}>
-              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Credits</span>
-              <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.credits.toLocaleString()}</span>
-            </div>
+              {/* Points */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                background: 'rgba(255, 255, 255, 0.1)', 
+                padding: '6px 10px', 
+                borderRadius: '6px',
+                backdropFilter: 'blur(4px)'
+              }}>
+                <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Points</span>
+                <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.points.toLocaleString()}</span>
+              </div>
 
-            {/* Level */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              padding: '6px 10px', 
-              borderRadius: '6px',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Level</span>
-              <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.level}</span>
-            </div>
+              {/* Credits */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                background: 'rgba(255, 255, 255, 0.1)', 
+                padding: '6px 10px', 
+                borderRadius: '6px',
+                backdropFilter: 'blur(4px)'
+              }}>
+                <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Credits</span>
+                <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.credits.toLocaleString()}</span>
+              </div>
 
-            {/* Team */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              padding: '6px 10px', 
-              borderRadius: '6px',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Team</span>
-              <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.team}</span>
+              {/* Level */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                background: 'rgba(255, 255, 255, 0.1)', 
+                padding: '6px 10px', 
+                borderRadius: '6px',
+                backdropFilter: 'blur(4px)'
+              }}>
+                <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Level</span>
+                <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.level}</span>
+              </div>
+
+              {/* Team */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                background: 'rgba(255, 255, 255, 0.1)', 
+                padding: '6px 10px', 
+                borderRadius: '6px',
+                backdropFilter: 'blur(4px)'
+              }}>
+                <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.75em', fontWeight: '500' }}>Team</span>
+                <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: '#fff' }}>{safePlayer.team}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -350,8 +495,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
-            alignItems: 'flex-start',
-            marginTop: 'auto'
+            alignItems: 'flex-start'
           }}>
             <span style={{ 
               color: 'rgba(255,255,255,0.9)', 
@@ -361,48 +505,59 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
               letterSpacing: '0.5px',
               textAlign: 'left',
               width: '100%'
-            }}>Current Streak</span>
+            }}>Log-In Daily for a Bonus</span>
             <div style={{
               background: 'rgba(255, 255, 255, 0.1)',
               padding: '16px',
               borderRadius: '8px',
               backdropFilter: 'blur(4px)',
-              width: '100%'
+              width: '100%',
+              boxSizing: 'border-box'
             }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                width: '100%',
-                gap: '6px'
-              }}>
-                {[...Array(10)].map((_, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      flex: '1',
-                      aspectRatio: '1',
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      border: '2px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backdropFilter: 'blur(4px)',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                      minWidth: '0'
-                    }}
-                  >
-                    {index < 3 && (
-                      <span style={{
-                        color: 'rgba(255,255,255,0.9)',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                      }}>✓</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              {streakData ? (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  width: '100%'
+                }}>
+                  {Array.from({ length: streakData.countLimit }, (_, i) => {
+                    // Always show boxes, with count 0 if no player streak
+                    const currentCount = playerStreak?.count || 0;
+                    const isCompleted = i < currentCount;
+                    console.log(`Box ${i + 1}:`, { 
+                      isCompleted, 
+                      currentCount,
+                      streakData: playerStreak 
+                    });
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          flex: '1',
+                          aspectRatio: '1',
+                          minWidth: '0',
+                          backgroundColor: isCompleted ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.9em',
+                          color: 'rgba(255,255,255,0.9)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          transition: 'background-color 0.2s ease'
+                        }}
+                      >
+                        {i + 1}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', width: '100%', padding: '20px', color: 'rgba(255,255,255,0.9)' }}>
+                  No streak data available
+                </div>
+              )}
             </div>
           </div>
         </div>
