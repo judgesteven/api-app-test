@@ -118,6 +118,7 @@ interface WheelMetadata {
   name: string;
   description?: string;
   cost: number;
+  credits?: number; // Add this line
   end_date?: string;
   prizes: WheelPrize[];
 }
@@ -907,6 +908,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
         name: data.name || 'Mystery Prize Wheel',
         description: data.description || 'Spin the wheel to win amazing prizes!',
         cost: data.cost || 100,
+        credits: data.credits, // Add this line
         end_date: data.end_date,
         prizes: Array.isArray(data.prizes) && data.prizes.length > 0 ? data.prizes : Array(16).fill(null).map((_, index) => ({
           id: `prize-${index}`,
@@ -2304,7 +2306,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     marginTop: 12
                   }}>
                     <span style={{ fontWeight: 'bold' }}>Credits:</span>
-                    <span>{typeof wheelMetadata?.cost === 'number' ? wheelMetadata.cost : '—'}</span>
+                    <span>{typeof wheelMetadata?.credits === 'number' ? wheelMetadata.credits : (typeof wheelMetadata?.cost === 'number' ? wheelMetadata.cost : '—')}</span>
                   </div>
                 </div>
               </div>
