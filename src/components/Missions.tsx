@@ -61,6 +61,7 @@ interface Prize {
     from: string;
     to: string;
   };
+  category?: string;  // Added category field
 }
 
 interface MissionsProps {
@@ -105,8 +106,24 @@ interface RedeemedPrize {
   };
 }
 
+// Add new interface for wheel data
+interface WheelPrize {
+  id: string;
+  name: string;
+  probability: number;
+}
+
+interface WheelMetadata {
+  id: string;
+  name: string;
+  description?: string;
+  cost: number;
+  end_date?: string;
+  prizes: WheelPrize[];
+}
+
 const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, playerProfile, onRefresh, apiKey }) => {
-  const [activeTab, setActiveTab] = useState<'missions' | 'quizzes' | 'prizes' | 'leaderboard' | 'player' | 'badges'>('missions');
+  const [activeTab, setActiveTab] = useState<'missions' | 'quizzes' | 'prizes' | 'leaderboard' | 'player' | 'badges' | 'mystery'>('missions');
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -153,6 +170,18 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [completedQuizzes, setCompletedQuizzes] = useState<any[]>([]);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  // Add new state for wheel
+  const [wheelPrizes, setWheelPrizes] = useState<WheelPrize[]>([]);
+  const [isLoadingWheel, setIsLoadingWheel] = useState(false);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [selectedPrize, setSelectedPrize] = useState<WheelPrize | null>(null);
+  // Update the state to include wheel metadata
+  const [wheelMetadata, setWheelMetadata] = useState<WheelMetadata | null>(null);
+  // Add at the top of the component, after other useState hooks
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [isWheelSpinning, setIsWheelSpinning] = useState(false);
+  const [lastWinningSegment, setLastWinningSegment] = useState<number | null>(null);
+  const [showWinIndicator, setShowWinIndicator] = useState<boolean | null>(null);
 
   // Add a helper function to safely get string values
   const getStringValue = (value: any): string => {
@@ -842,6 +871,63 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
     }
   };
 
+  // Add new function to fetch wheel prizes
+  const fetchWheelPrizes = async () => {
+    const apiKey = localStorage.getItem('apiKey');
+    const account = localStorage.getItem('account');
+    
+    if (!apiKey || !account) {
+      console.error('Missing required data:', { hasApiKey: !!apiKey, hasAccount: !!account });
+      toast.error('API key or account is missing');
+      return;
+    }
+
+    setIsLoadingWheel(true);
+    try {
+      console.log('[WHEEL DEBUG] Starting wheel data fetch');
+      const response = await fetch(`https://api.gamelayer.co/api/v0/mysteryboxes/1-test-wheel?account=${encodeURIComponent(account)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": apiKey
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to fetch wheel data: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[WHEEL DEBUG] Raw wheel data:', data);
+
+      // Create metadata with default prizes if none exist
+      const metadata: WheelMetadata = {
+        id: data.id || '1-test-wheel',
+        name: data.name || 'Mystery Prize Wheel',
+        description: data.description || 'Spin the wheel to win amazing prizes!',
+        cost: data.cost || 100,
+        end_date: data.end_date,
+        prizes: Array.isArray(data.prizes) && data.prizes.length > 0 ? data.prizes : Array(16).fill(null).map((_, index) => ({
+          id: `prize-${index}`,
+          name: index % 2 === 0 ? 'Win' : 'No Win',
+          probability: 1/16
+        }))
+      };
+
+      console.log('[WHEEL DEBUG] Processed wheel metadata:', metadata);
+      setWheelMetadata(metadata);
+      setWheelPrizes(metadata.prizes);
+    } catch (error) {
+      console.error('[WHEEL DEBUG] Error fetching wheel data:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch wheel data');
+      setWheelMetadata(null);
+      setWheelPrizes([]);
+    } finally {
+      setIsLoadingWheel(false);
+    }
+  };
+
   React.useEffect(() => {
     if (activeTab === 'badges') {
       fetchAllAchievements();
@@ -853,8 +939,41 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
       fetchPlayerHistory();
     } else if (activeTab === 'quizzes') {
       fetchQuiz();
+    } else if (activeTab === 'mystery') {
+      console.log('[WHEEL DEBUG] Mystery tab selected, current state:', {
+        isLoadingWheel,
+        wheelPrizesCount: wheelPrizes.length,
+        hasWheelMetadata: !!wheelMetadata,
+        wheelMetadata: wheelMetadata
+      });
+      fetchWheelPrizes();
     }
   }, [activeTab, playerProfile?.player_id]);
+
+  // Add logging for wheel rendering
+  React.useEffect(() => {
+    if (activeTab === 'mystery') {
+      console.log('[WHEEL DEBUG] Wheel render state:', {
+        isLoadingWheel,
+        wheelPrizesCount: wheelPrizes.length,
+        hasWheelMetadata: !!wheelMetadata,
+        wheelMetadata: wheelMetadata,
+        prizes: wheelPrizes.map(p => ({ id: p.id, name: p.name }))
+      });
+    }
+  }, [activeTab, isLoadingWheel, wheelPrizes, wheelMetadata]);
+
+  // Add logging for mystery tab selection
+  React.useEffect(() => {
+    if (activeTab === 'mystery') {
+      console.log('[WHEEL DEBUG] Mystery tab selected, current state:', {
+        isLoadingWheel,
+        wheelPrizesCount: wheelPrizes.length,
+        hasWheelMetadata: !!wheelMetadata,
+        wheelMetadata: wheelMetadata
+      });
+    }
+  }, [activeTab, isLoadingWheel, wheelPrizes, wheelMetadata]);
 
   if (isLoading) {
     return (
@@ -939,6 +1058,27 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
           }}
         >
           Prizes
+        </button>
+        <button
+          onClick={() => setActiveTab('mystery')}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: activeTab === 'mystery' ? '#646cff' : 'transparent',
+            color: activeTab === 'mystery' ? 'white' : '#666',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.1em',
+            fontWeight: 'bold',
+            borderRadius: '8px 8px 0 0',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            marginBottom: '-1px',
+            borderBottom: activeTab === 'mystery' ? '3px solid #646cff' : 'none',
+            boxShadow: activeTab === 'mystery' ? '0 -2px 4px rgba(0,0,0,0.1)' : 'none',
+            transform: activeTab === 'mystery' ? 'scale(1.05)' : 'scale(1)'
+          }}
+        >
+          Mystery
         </button>
         <button
           onClick={() => setActiveTab('leaderboard')}
@@ -1563,7 +1703,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   gap: '20px',
                   gridTemplateColumns: '1fr'
                 }}>
-                  {prizes.map((prize) => {
+                  {prizes
+                    .filter(prize => prize.category !== 'Hidden')  // Filter out hidden prizes
+                    .map((prize) => {
                     const isHovered = hoveredCard === prize.id;
                     return (
                       <div
@@ -1811,6 +1953,362 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
             )}
           </div>
         </div>
+
+        {activeTab === 'mystery' && (
+          <div style={{
+            padding: '20px',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            maxWidth: '800px',
+            margin: '20px auto'
+          }}>
+            {/* Mystery Card */}
+            <div style={{
+              padding: '30px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '16px',
+              backgroundColor: '#f8f8f8',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '24px',
+              marginBottom: '30px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+            }}>
+              {/* Mystery Box Name */}
+              {wheelMetadata?.name && (
+                <h2 style={{
+                  margin: '0 0 10px 0',
+                  color: '#646cff',
+                  fontSize: '2em',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  letterSpacing: 0.5
+                }}>{wheelMetadata.name}</h2>
+              )}
+              {/* Card Header */}
+              <div style={{
+                textAlign: 'center',
+                width: '100%'
+              }}>
+                {wheelMetadata?.end_date && (
+                  <p style={{
+                    margin: '0',
+                    color: '#ff6b6b',
+                    fontSize: '0.9em',
+                    fontWeight: 'bold'
+                  }}>
+                    Ends: {new Date(wheelMetadata.end_date).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+
+              {/* Time Remaining with Clock Icon */}
+              {wheelMetadata?.end_date && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  marginBottom: 12,
+                  fontSize: '1.1em',
+                  color: '#666',
+                  fontWeight: 500
+                }}>
+                  <span role="img" aria-label="clock">⏰</span>
+                  <span>Expires in: {getTimeRemaining(wheelMetadata.end_date)}</span>
+                </div>
+              )}
+
+              {/* Wheel Container */}
+              <div style={{
+                position: 'relative',
+                width: '400px',
+                height: '400px',
+                marginBottom: '24px'
+              }}>
+                {/* Mystery Prize Wheel */}
+                <div
+                  style={{
+                    width: '376px',
+                    height: '376px',
+                    position: 'absolute',
+                    top: 12,
+                    left: 12,
+                    zIndex: 1,
+                    transition: isWheelSpinning ? 'transform 3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                    transform: `rotate(${wheelRotation}deg)`
+                  }}
+                >
+                  <svg width="376" height="376" viewBox="0 0 376 376" style={{ width: '100%', height: '100%' }}>
+                    {[...Array(12)].map((_, i) => {
+                      const center = 188;
+                      const radius = 188;
+                      // Start at -90 degrees (top) and rotate clockwise
+                      // Win zone is now at 3 o'clock (90 degrees)
+                      const startAngle = (i * 30 - 90) * Math.PI / 180;
+                      const endAngle = ((i + 1) * 30 - 90) * Math.PI / 180;
+                      const x1 = center + radius * Math.cos(startAngle);
+                      const y1 = center + radius * Math.sin(startAngle);
+                      const x2 = center + radius * Math.cos(endAngle);
+                      const y2 = center + radius * Math.sin(endAngle);
+                      const largeArc = 0;
+                      // Win zone is now at segment 3 (3 o'clock)
+                      const color = i === 3 ? '#ffd600' : (i % 2 === 0 ? '#646cff' : '#535bf2');
+                      return (
+                        <path
+                          key={`svg-segment-${i}`}
+                          d={`M${center},${center} L${x1},${y1} A${radius},${radius} 0 ${largeArc} 1 ${x2},${y2} Z`}
+                          fill={color}
+                        />
+                      );
+                    })}
+                  </svg>
+
+                  {/* 12 Lights */}
+                  {[...Array(12)].map((_, i) => {
+                    const angle = (i * 30 - 90) * (Math.PI / 180); // -90 to start at top
+                    const radius = 188 - 18; // inner radius minus light size
+                    const x = 188 + radius * Math.cos(angle) - 10; // center + offset - half light size
+                    const y = 188 + radius * Math.sin(angle) - 10;
+                    return (
+                      <div
+                        key={`wheel-light-${i}`}
+                        style={{
+                          position: 'absolute',
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: '#ffd600',
+                          boxShadow: '0 0 8px 2px #ffd60099',
+                          left: x,
+                          top: y,
+                          zIndex: 3,
+                          border: '3px solid #fff',
+                        }}
+                      />
+                    );
+                  })}
+
+                  {/* Section dividers */}
+                  {[...Array(12)].map((_, i) => (
+                    <div
+                      key={`wheel-divider-${i}`}
+                      style={{
+                        position: 'absolute',
+                        width: '2px',
+                        height: '188px',
+                        backgroundColor: '#fff',
+                        transformOrigin: 'bottom center',
+                        transform: `rotate(${i * 30}deg)`,
+                        top: '0px',
+                        left: '188px',
+                        marginLeft: '-1px',
+                        opacity: 0.5,
+                        zIndex: 2
+                      }}
+                    />
+                  ))}
+
+                  {/* Center circle */}
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    backgroundColor: '#646cff',
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                  }} />
+                </div>
+
+                {/* Pointer at 3 o'clock (inward facing, tip toward wheel) */}
+                <div style={{
+                  position: 'absolute',
+                  width: 0,
+                  height: 0,
+                  left: '100%',
+                  top: '50%',
+                  transform: 'translateY(-50%) rotate(90deg)', // Point tip toward wheel
+                  borderLeft: '18px solid transparent',
+                  borderRight: '18px solid transparent',
+                  borderTop: '32px solid #ffd600', // Inward facing
+                  zIndex: 10,
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))'
+                }} />
+              </div>
+
+              {/* Wheel Description below the wheel */}
+              {wheelMetadata?.description && (
+                <div style={{
+                  margin: '0 auto 18px auto',
+                  maxWidth: 400,
+                  textAlign: 'center',
+                  color: '#666',
+                  fontSize: '1.08em',
+                  fontWeight: 500
+                }}>
+                  {wheelMetadata.description}
+                </div>
+              )}
+
+              {/* Prizes info and SPIN! button/credits in a row */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                gap: 32,
+                margin: '0 auto 18px auto',
+                maxWidth: 700,
+                width: '100%'
+              }}>
+                {/* Prizes info (left) */}
+                {prizes && prizes.filter(p => {
+                  const hasMBCategory = Array.isArray(p.category)
+                    ? p.category.includes('MB')
+                    : p.category === 'MB';
+                  const hasMBTag = Array.isArray((p as any).tags)
+                    ? ((p as any).tags as string[]).includes('MB')
+                    : false;
+                  return hasMBCategory || hasMBTag;
+                }).length > 0 && (
+                  <div style={{
+                    flex: 2,
+                    minWidth: 0,
+                    color: '#333',
+                    fontSize: '1.08em',
+                    fontWeight: 500,
+                    background: '#f3f4fa',
+                    borderRadius: 8,
+                    padding: '12px 0 8px 0',
+                    boxShadow: '0 1px 4px rgba(100,108,255,0.07)',
+                    textAlign: 'left',
+                    maxWidth: 500 // increased from 400 to 500 (25% larger)
+                  }}>
+                    <div style={{ fontWeight: 700, marginBottom: 6, color: '#646cff' }}>Prizes Available</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {prizes
+                        .filter(p => {
+                          const hasMBCategory = Array.isArray(p.category)
+                            ? p.category.includes('MB')
+                            : p.category === 'MB';
+                          const hasMBTag = Array.isArray((p as any).tags)
+                            ? ((p as any).tags as string[]).includes('MB')
+                            : false;
+                          return hasMBCategory || hasMBTag;
+                        })
+                        .sort((a, b) => {
+                          // Remove 'MB' from names for sorting and display
+                          const nameA = (a.name || '').replace(/MB/gi, '').trim();
+                          const nameB = (b.name || '').replace(/MB/gi, '').trim();
+                          return nameA.localeCompare(nameB);
+                        })
+                        .map(prize => (
+                          <div key={prize.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 12px', textAlign: 'left' }}>
+                            <span style={{ flex: 1, textAlign: 'left' }}>{(prize.name || '').replace(/MB/gi, '').trim()}</span>
+                            <span style={{
+                              background: '#646cff',
+                              color: 'white',
+                              padding: '2px 10px',
+                              borderRadius: '6px',
+                              fontWeight: 'bold',
+                              fontSize: '0.98em',
+                              marginLeft: 8,
+                              width: '48px', // Fixed width for all quantity badges
+                              minWidth: '48px', // Ensure minimum width
+                              display: 'inline-flex', // Use flexbox for centering
+                              justifyContent: 'center', // Center the number
+                              alignItems: 'center', // Vertical center
+                              textAlign: 'center',
+                            }}>{prize.stock?.available ?? 0}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+                {/* SPIN! button and credits (right) */}
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  minWidth: 120
+                }}>
+                  <button
+                    onClick={async () => {
+                      if (isWheelSpinning) return;
+                      setIsWheelSpinning(true);
+                      setShowWinIndicator(null);
+                      // Randomly select a segment (0-11)
+                      const selected = Math.floor(Math.random() * 12);
+                      setLastWinningSegment(selected);
+                      // For 3 o'clock, pointer is at segment 3
+                      const pointerSegment = 3;
+                      const extraSpins = 5;
+                      const finalRotation = 360 * extraSpins + (360 - ((selected - pointerSegment + 12) % 12) * 30);
+                      setWheelRotation(finalRotation);
+                      // Wait for animation to finish
+                      setTimeout(() => {
+                        setIsWheelSpinning(false);
+                        setWheelRotation((360 - ((selected - pointerSegment + 12) % 12) * 30) % 360); // keep wheel at final position
+                        setShowWinIndicator(selected === pointerSegment);
+                        if (selected === pointerSegment) {
+                          toast.success('🏆 WIN ZONE!');
+                        } else {
+                          toast.error('❌ Not a win');
+                        }
+                      }, 3000);
+                    }}
+                    disabled={isWheelSpinning}
+                    style={{
+                      backgroundColor: '#646cff',
+                      color: 'white',
+                      padding: '12px 32px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      fontSize: '1.2em',
+                      fontWeight: 'bold',
+                      cursor: isWheelSpinning ? 'not-allowed' : 'pointer',
+                      opacity: isWheelSpinning ? 0.7 : 1,
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      transform: isWheelSpinning ? 'scale(0.95)' : 'scale(1)',
+                      marginTop: 12
+                    }}
+                  >
+                    Spin!
+                  </button>
+                  {/* Credits Display below button */}
+                  <div style={{
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.9em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    marginTop: 12
+                  }}>
+                    <span style={{ fontWeight: 'bold' }}>Credits:</span>
+                    <span>{typeof wheelMetadata?.cost === 'number' ? wheelMetadata.cost : '—'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={{
           width: '100%',
