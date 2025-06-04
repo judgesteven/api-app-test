@@ -1777,7 +1777,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                               fontSize: '0.95em',
                               lineHeight: '1.4',
                               textAlign: 'left',
-                              transition: 'all 0.3s ease'
+                              transition: 'all 0.3s ease',
+                              width: '100%', // Fill the content area
+                              padding: 0 // Remove side padding for true 100% width
                             }}>
                               {prize.description}
                             </p>
@@ -1978,14 +1980,14 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
             }}>
               {/* Mystery Box Name */}
               {wheelMetadata?.name && (
-                <h2 style={{
-                  margin: '0 0 10px 0',
-                  color: '#646cff',
-                  fontSize: '2em',
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  letterSpacing: 0.5
-                }}>{wheelMetadata.name}</h2>
+                <h3 style={{
+                  margin: 0,
+                  color: '#333', // Match mission title color
+                  fontSize: '1.2em',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease',
+                  textAlign: 'left'
+                }}>{wheelMetadata.name}</h3>
               )}
               {/* Card Header */}
               <div style={{
@@ -2148,9 +2150,9 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
               {/* Wheel Description below the wheel */}
               {wheelMetadata?.description && (
                 <div style={{
-                  margin: '0 auto 18px auto',
-                  maxWidth: 400,
-                  textAlign: 'center',
+                  margin: '0 0 18px 0',
+                  width: '100%', // Fill the available width
+                  textAlign: 'left',
                   color: '#666',
                   fontSize: '1.08em',
                   fontWeight: 500
