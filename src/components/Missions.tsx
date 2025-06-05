@@ -2042,7 +2042,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     left: 12,
                     zIndex: 1,
                     transition: isWheelSpinning ? 'transform 3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-                    transform: `rotate(${wheelRotation}deg)`
+                    transform: `rotate(${wheelRotation - 15}deg)`
                   }}
                 >
                   <svg width="376" height="376" viewBox="0 0 376 376" style={{ width: '100%', height: '100%' }}>
