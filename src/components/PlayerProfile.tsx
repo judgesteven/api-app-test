@@ -17,6 +17,24 @@ interface StreakData {
   name: string;
   countLimit: number;
   count?: number;  // Add count for active streak
+  period?: string;
+  reward?: {
+    points: number;
+    credits: number;
+    achievements: any[];
+  };
+  active?: {
+    from: string;
+    to: string;
+  };
+  isAvailable?: boolean;
+  limitCount?: boolean;
+  category?: string;
+  description?: string;
+  imgUrl?: string;
+  priority?: number;
+  tags?: string[];
+  account?: string;
 }
 
 interface StreakResponse {
@@ -33,6 +51,11 @@ interface PlayerStreak {
   limitCount: boolean;
   objectives: any[];
   account: string;
+  actions?: {
+    count: number;
+    startedOn?: string;
+    lastStreakOn?: string;
+  };
 }
 
 interface PlayerProfileProps {
@@ -65,6 +88,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
   const [streakData, setStreakData] = useState<StreakData | null>(null);
   const [playerStreak, setPlayerStreak] = useState<PlayerStreak | null>(null);
   const [isLoadingStreak, setIsLoadingStreak] = useState(false);
+  const [currentPlayer, setCurrentPlayer] = useState(player);
 
   useEffect(() => {
     const fetchAchievements = async () => {
@@ -127,17 +151,17 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
     const apiKey = localStorage.getItem('apiKey');
     const account = localStorage.getItem('account');
     const playerId = player?.player_id || player?.id;
+    const streakId = 'streak-test';
     
     if (!apiKey || !account || !playerId) {
       console.error('Missing required data:', { hasApiKey: !!apiKey, hasAccount: !!account, playerId });
       return;
     }
 
-    console.log('Fetching streak data with:', { playerId, account });
     setIsLoadingStreak(true);
     try {
-      // First fetch the streak definition
-      const streakResponse = await fetch(`https://api.gamelayer.co/api/v0/streaks/1-test-streak?account=${encodeURIComponent(account)}`, {
+      // Fetch the streak definition for 'streak-test'
+      const streakResponse = await fetch(`https://api.gamelayer.co/api/v0/streaks/${streakId}?account=${encodeURIComponent(account)}`, {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -156,11 +180,9 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
       }
 
       const streakData = await streakResponse.json();
-      console.log('Streak definition data:', streakData);
       setStreakData(streakData);
 
-      // Then fetch the player's streak status
-      console.log('Fetching player streak status for:', playerId);
+      // Fetch the player's streaks and find progress for 'streak-test'
       const playerStreakResponse = await fetch(`https://api.gamelayer.co/api/v0/players/${playerId}/streaks?account=${encodeURIComponent(account)}`, {
         headers: {
           "Content-Type": "application/json",
@@ -180,32 +202,33 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
       }
 
       const playerStreaks = await playerStreakResponse.json();
-      console.log('Raw player streaks response:', playerStreaks);
-
-      // Initialize with a default streak object if none exists
-      let activeStreak = playerStreaks.started?.find((streak: PlayerStreak) => 
-        streak.id === '1-test-streak'
-      ) || playerStreaks.completed?.find((streak: PlayerStreak) => 
-        streak.id === '1-test-streak'
-      );
-
-      if (!activeStreak) {
-        console.log('No active streak found, initializing with default values');
-        // Create a default streak object with count 0
-        activeStreak = {
-          id: '1-test-streak',
+      // Find 'streak-test' in started or completed
+      let activeStreak = null;
+      if (playerStreaks.started && Array.isArray(playerStreaks.started)) {
+        activeStreak = playerStreaks.started.find((s: any) => s.id === streakId);
+      }
+      if (!activeStreak && playerStreaks.completed && Array.isArray(playerStreaks.completed)) {
+        activeStreak = playerStreaks.completed.find((s: any) => s.id === streakId);
+      }
+      if (activeStreak) {
+        setPlayerStreak({
+          ...activeStreak,
+          count: activeStreak.actions?.count || 0
+        });
+      } else {
+        // If not found, initialize with default values from streakData
+        setPlayerStreak({
+          id: streakData.id,
           name: streakData.name,
           count: 0,
           status: 'started',
-          countLimit: streakData.countLimit,
-          limitCount: streakData.limitCount,
-          objectives: streakData.objectives,
-          account: account
-        };
+          countLimit: streakData.countLimit || 1,
+          limitCount: streakData.limitCount || false,
+          objectives: streakData.objectives || [],
+          account: account,
+          actions: { count: 0 }
+        });
       }
-
-      console.log('Final streak data to be used:', activeStreak);
-      setPlayerStreak(activeStreak);
     } catch (error) {
       console.error('Error fetching streak data:', error);
       setStreakData(null);
@@ -230,6 +253,55 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
     }
   }, [player]);
 
+  // Add polling effect to fetch latest player data
+  useEffect(() => {
+    const fetchLatestPlayerData = async () => {
+      const playerId = player?.player_id || player?.id;
+      const account = localStorage.getItem('account');
+      const apiKey = localStorage.getItem('apiKey');
+      
+      if (!playerId || !account || !apiKey) {
+        console.log('Missing required data for player polling:', { playerId, account, hasApiKey: !!apiKey });
+        return;
+      }
+
+      try {
+        const response = await fetch(`https://api.gamelayer.co/api/v0/players/${playerId}?account=${encodeURIComponent(account)}`, {
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "api-key": apiKey
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch latest player data: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Latest player data from polling:', data);
+        
+        setCurrentPlayer({
+          ...player,
+          level: data.level || { name: 'Unknown Level' },
+          points: data.points || 0,
+          credits: data.credits || 0
+        });
+      } catch (error) {
+        console.error('Error fetching latest player data:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchLatestPlayerData();
+
+    // Set up polling interval (every 10 seconds)
+    const intervalId = setInterval(fetchLatestPlayerData, 10000);
+
+    // Cleanup interval on unmount or when player changes
+    return () => clearInterval(intervalId);
+  }, [player]);
+
   console.log('PlayerProfile received props:', { player, isLoading, teams });
 
   if (isLoading) {
@@ -248,15 +320,15 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
     );
   }
 
-  // Ensure all values are strings or numbers
+  // Update safePlayer to use currentPlayer instead of player prop
   const safePlayer = {
-    name: String(player.name || ''),
-    avatar: String(player.avatar || player.imgUrl || ''),
-    level: String(player.level?.name || 'Unknown Level'),
-    team: teams[player.team] || String(player.team || ''),
-    points: Number(player.points || 0),
-    credits: Number(player.credits || 0),
-    description: String(player.description || '')
+    name: String(currentPlayer?.name || ''),
+    avatar: String(currentPlayer?.avatar || currentPlayer?.imgUrl || ''),
+    level: String(currentPlayer?.level?.name || 'Unknown Level'),
+    team: teams[currentPlayer?.team || ''] || String(currentPlayer?.team || ''),
+    points: Number(currentPlayer?.points || 0),
+    credits: Number(currentPlayer?.credits || 0),
+    description: String(currentPlayer?.description || '')
   };
 
   console.log('PlayerProfile safePlayer:', {
@@ -494,7 +566,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
             alignItems: 'flex-start'
           }}>
             <span style={{ 
@@ -505,56 +577,53 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ player, isLoading, teams 
               letterSpacing: '0.5px',
               textAlign: 'left',
               width: '100%'
-            }}>Log-In Daily for a Bonus</span>
+            }}>{streakData?.name || 'Loading streak...'}</span>
             <div style={{
               background: 'rgba(255, 255, 255, 0.1)',
-              padding: '16px',
+              padding: '8px',
               borderRadius: '8px',
               backdropFilter: 'blur(4px)',
               width: '100%',
               boxSizing: 'border-box'
             }}>
               {streakData ? (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  width: '100%'
-                }}>
-                  {Array.from({ length: streakData.countLimit }, (_, i) => {
-                    // Always show boxes, with count 0 if no player streak
-                    const currentCount = playerStreak?.count || 0;
-                    const isCompleted = i < currentCount;
-                    console.log(`Box ${i + 1}:`, { 
-                      isCompleted, 
-                      currentCount,
-                      streakData: playerStreak 
-                    });
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          flex: '1',
-                          aspectRatio: '1',
-                          minWidth: '0',
-                          backgroundColor: isCompleted ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.9em',
-                          color: 'rgba(255,255,255,0.9)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
-                          transition: 'background-color 0.2s ease'
-                        }}
-                      >
-                        {i + 1}
-                      </div>
-                    );
-                  })}
-                </div>
+                <>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '4px',
+                    width: '100%',
+                    marginBottom: '4px'
+                  }}>
+                    {Array.from({ length: streakData.countLimit }, (_, i) => {
+                      const currentCount = playerStreak?.count || 0;
+                      const isCompleted = i < currentCount;
+                      return (
+                        <div
+                          key={i}
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            backgroundColor: isCompleted ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.3em',
+                            color: 'rgba(255,255,255,0.9)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            transition: 'background-color 0.2s ease',
+                            margin: '0 2px'
+                          }}
+                        >
+                          {i + 1}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               ) : (
-                <div style={{ textAlign: 'center', width: '100%', padding: '20px', color: 'rgba(255,255,255,0.9)' }}>
+                <div style={{ textAlign: 'center', width: '100%', padding: '10px', color: 'rgba(255,255,255,0.9)' }}>
                   No streak data available
                 </div>
               )}
