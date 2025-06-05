@@ -183,6 +183,10 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
   const [isWheelSpinning, setIsWheelSpinning] = useState(false);
   const [lastWinningSegment, setLastWinningSegment] = useState<number | null>(null);
   const [showWinIndicator, setShowWinIndicator] = useState<boolean | null>(null);
+  const [winPrizeImg, setWinPrizeImg] = useState<string | null>(null);
+  const [winPrizeDetails, setWinPrizeDetails] = useState<any>(null);
+  // Add new state for no-win animation
+  const [showNoWinText, setShowNoWinText] = useState(false);
 
   // Add a helper function to safely get string values
   const getStringValue = (value: any): string => {
@@ -477,6 +481,32 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
 
     setIsLoadingPlayerHistory(true);
     try {
+      // Fetch latest player details including level
+      const playerDetailsUrl = `https://api.gamelayer.co/api/v0/players/${playerId}?account=${encodeURIComponent(account)}`;
+      console.log('Fetching latest player details from:', playerDetailsUrl);
+      
+      const playerDetailsResponse = await fetch(playerDetailsUrl, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "api-key": apiKey
+        }
+      });
+
+      if (!playerDetailsResponse.ok) {
+        const errorText = await playerDetailsResponse.text();
+        console.error('Player details error response:', errorText);
+        throw new Error(`Failed to fetch player details: ${playerDetailsResponse.status} ${playerDetailsResponse.statusText}`);
+      }
+
+      const playerDetails = await playerDetailsResponse.json();
+      console.log('Latest player details:', playerDetails);
+      
+      // Update player profile with latest data
+      if (playerDetails && onRefresh) {
+        await onRefresh();
+      }
+
       // Fetch player missions
       const missionsUrl = `https://api.gamelayer.co/api/v0/players/${playerId}/missions?account=${encodeURIComponent(account)}`;
       console.log('Fetching missions from:', missionsUrl);
@@ -2045,6 +2075,56 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                     transform: `rotate(${wheelRotation - 15}deg)`
                   }}
                 >
+                  {/* Win Zone Animation Overlay */}
+                  {(showWinIndicator || showNoWinText) && (
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      width: '100%',
+                      height: '100%',
+                      zIndex: 10,
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      animation: showWinIndicator ? 'winPulse 1.2s cubic-bezier(0.4,0,0.2,1) 2' : 'noWinPulse 1.2s cubic-bezier(0.4,0,0.2,1) 2',
+                    }}>
+                      {winPrizeImg && showWinIndicator ? (
+                        <img src={winPrizeImg} alt="Prize" style={{ width: 120, height: 120, borderRadius: '50%', boxShadow: '0 0 48px 24px #ffd60066', animation: 'winGlow 1.2s cubic-bezier(0.4,0,0.2,1) 2', pointerEvents: 'none', objectFit: 'cover', background: '#fff' }} />
+                      ) : showNoWinText ? (
+                        <div style={{
+                          width: 220,
+                          height: 220,
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle, #ff6b6b88 0%, #ff6b6b44 60%, transparent 100%)',
+                          boxShadow: '0 0 48px 24px #ff6b6b66',
+                          animation: 'noWinGlow 1.2s cubic-bezier(0.4,0,0.2,1) 2',
+                          pointerEvents: 'none',
+                        }} />
+                      ) : showWinIndicator ? (
+                        <div style={{
+                          width: 220,
+                          height: 220,
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle, #ffd60088 0%, #ffd60044 60%, transparent 100%)',
+                          boxShadow: '0 0 48px 24px #ffd60066',
+                          animation: 'winGlow 1.2s cubic-bezier(0.4,0,0.2,1) 2',
+                          pointerEvents: 'none',
+                        }} />
+                      ) : null}
+                      <span style={{
+                        position: 'absolute',
+                        color: showNoWinText ? '#ff6b6b' : '#ffd600',
+                        fontSize: '3em',
+                        fontWeight: 900,
+                        textShadow: showNoWinText ? '0 2px 12px #fff, 0 0 32px #ff6b6b' : '0 2px 12px #fff, 0 0 32px #ffd600',
+                        letterSpacing: 2,
+                        pointerEvents: 'none',
+                        animation: showNoWinText ? 'noWinTextPop 1.2s cubic-bezier(0.4,0,0.2,1) 2' : 'winTextPop 1.2s cubic-bezier(0.4,0,0.2,1) 2',
+                      }}>{showNoWinText ? 'No Win This Time!' : (winPrizeDetails?.name ? winPrizeDetails.name : '🏆 WIN!')}</span>
+                    </div>
+                  )}
                   <svg width="376" height="376" viewBox="0 0 376 376" style={{ width: '100%', height: '100%' }}>
                     {[...Array(12)].map((_, i) => {
                       const center = 188;
@@ -2217,7 +2297,7 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                         })
                         .map(prize => (
                           <div key={prize.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 12px', textAlign: 'left' }}>
-                            <span style={{ flex: 1, textAlign: 'left' }}>{(prize.name || '').replace(/MB/gi, '').trim()}</span>
+                            <span style={{ flex: 1, textAlign: 'left' }}>{prize.description ? prize.description : (prize.name || '').replace(/MB/gi, '').trim()}</span>
                             <span style={{
                               background: '#646cff',
                               color: 'white',
@@ -2250,27 +2330,81 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
                   <button
                     onClick={async () => {
                       if (isWheelSpinning) return;
+                      if (!wheelMetadata || !playerProfile?.credits || playerProfile.credits < (wheelMetadata.credits || wheelMetadata.cost || 0)) {
+                        toast.error('Not enough credits to spin!');
+                        return;
+                      }
                       setIsWheelSpinning(true);
                       setShowWinIndicator(null);
-                      // Randomly select a segment (0-11)
-                      const selected = Math.floor(Math.random() * 12);
-                      setLastWinningSegment(selected);
-                      // For 3 o'clock, pointer is at segment 3
-                      const pointerSegment = 3;
-                      const extraSpins = 5;
-                      const finalRotation = 360 * extraSpins + (360 - ((selected - pointerSegment + 12) % 12) * 30);
-                      setWheelRotation(finalRotation);
-                      // Wait for animation to finish
-                      setTimeout(() => {
-                        setIsWheelSpinning(false);
-                        setWheelRotation((360 - ((selected - pointerSegment + 12) % 12) * 30) % 360); // keep wheel at final position
-                        setShowWinIndicator(selected === pointerSegment);
-                        if (selected === pointerSegment) {
-                          toast.success('🏆 WIN ZONE!');
-                        } else {
-                          toast.error('❌ Not a win');
+                      setShowNoWinText(false);
+                      setWinPrizeImg(null);
+                      setWinPrizeDetails(null);
+                      const apiKey = (localStorage.getItem('apiKey') || '') as string;
+                      const account = localStorage.getItem('account') || '';
+                      const playerId = playerProfile?.player_id || playerProfile?.id;
+                      try {
+                        // Call the claim API
+                        const res = await fetch(`https://api.gamelayer.co/api/v0/mysteryboxes/${wheelMetadata.id}/claim`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'api-key': apiKey
+                          },
+                          body: JSON.stringify({ account, player: playerId })
+                        });
+                        const data = await res.json();
+                        // 75% chance to win
+                        const isWin = Math.random() < 0.75 && res.ok && data && data.prize;
+                        let prizeId = null;
+                        let prizeDetails: Prize | null = null;
+                        if (isWin) {
+                          prizeId = data.prize.id || data.prize;
+                          // Fetch prize details
+                          const prizeRes = await fetch(`https://api.gamelayer.co/api/v0/prizes/${prizeId}?account=${encodeURIComponent(account)}`, {
+                            headers: { 'api-key': apiKey, 'Accept': 'application/json' }
+                          });
+                          prizeDetails = await prizeRes.json();
+                          setWinPrizeImg(prizeDetails?.imgUrl || null);
+                          setWinPrizeDetails(prizeDetails);
+                          // Add to redeemedPrizes
+                          if (prizeDetails) {
+                            setRedeemedPrizes(prev => [
+                              {
+                                id: prizeDetails!.id,
+                                name: prizeDetails!.name,
+                                redeemed_at: new Date().toISOString(),
+                                credits_spent: wheelMetadata.credits || wheelMetadata.cost || 0,
+                                credits: prizeDetails!.credits,
+                                count: 1,
+                                actions: { count: 1, completedOn: new Date().toISOString(), firstCompletedOn: new Date().toISOString() }
+                              },
+                              ...prev
+                            ]);
+                            // Fetch latest player history to update the Prizes Redeemed table
+                            await fetchPlayerHistory();
+                          }
                         }
-                      }, 3000);
+                        // Animate the wheel to the correct segment
+                        const selected = isWin ? 3 : (() => {
+                          const otherSegments = [...Array(12).keys()].filter(i => i !== 3);
+                          return otherSegments[Math.floor(Math.random() * otherSegments.length)];
+                        })();
+                        setLastWinningSegment(selected);
+                        const pointerSegment = 3;
+                        const extraSpins = 5;
+                        const finalRotation = 360 * extraSpins + (360 - ((selected - pointerSegment + 12) % 12) * 30);
+                        setWheelRotation(finalRotation);
+                        setTimeout(() => {
+                          setIsWheelSpinning(false);
+                          setWheelRotation((360 - ((selected - pointerSegment + 12) % 12) * 30) % 360);
+                          setShowWinIndicator(selected === pointerSegment);
+                          setShowNoWinText(selected !== pointerSegment);
+                        }, 3000);
+                      } catch (err) {
+                        console.error('Spin failed:', err);
+                        setIsWheelSpinning(false);
+                      }
                     }}
                     disabled={isWheelSpinning}
                     style={{
@@ -3020,3 +3154,46 @@ const Missions: React.FC<MissionsProps> = ({ missions, events, isLoading, player
 };
 
 export default Missions; 
+
+// Add keyframes for win zone animation
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes winPulse {
+  0% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+@keyframes winGlow {
+  0% { opacity: 0.2; box-shadow: 0 0 0 0 #ffd60066; }
+  50% { opacity: 1; box-shadow: 0 0 48px 24px #ffd600cc; }
+  100% { opacity: 0; box-shadow: 0 0 0 80px #ffd60000; }
+}
+@keyframes winTextPop {
+  0% { opacity: 0; transform: scale(0.7); }
+  40% { opacity: 1; transform: scale(1.2); }
+  80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+`;
+document.head.appendChild(style);
+
+// Add new keyframes for no-win animation
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes noWinPulse {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes noWinGlow {
+    0% { box-shadow: 0 0 48px 24px #ff6b6b66; }
+    50% { box-shadow: 0 0 64px 32px #ff6b6b88; }
+    100% { box-shadow: 0 0 48px 24px #ff6b6b66; }
+  }
+  @keyframes noWinTextPop {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+`;
+document.head.appendChild(styleSheet);
